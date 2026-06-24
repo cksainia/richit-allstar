@@ -352,6 +352,6 @@ const TEAM = ["🧢","⚾","🥎","🏆","🥇","🦅","🐯","🦁","🚀","�
    away with manipulatives, counting on, number line. */
 const MATH = [
   { id:"add", name:"Addition", emoji:"➕", type:"math", op:"add", color:"green", count:10 },
-  { id:"sub", name:"Subtraction", emoji:"➖", type:"math", op:"sub", color:"pink",  count:10 },
+  { id:"sub", name:"Subtraction", emoji:"➖", type:"math", op:"sub", color:"orange", count:10 },
 ];
 TOPICS.push(...MATH);

@@ -283,6 +283,27 @@
   .tslash.g2{background:var(--green);}
   .tmark.gone,.tslash.gone{background:#d9514e;opacity:.45;}
   .tzero{font-size:24px;font-weight:900;color:var(--muted);}
+
+  /* ===== operation recognition + consistent add/subtract coding ===== */
+  :root{ --orange:#e8913a; }
+  .unit.c-orange{border-top-color:var(--orange);}
+  .opsign{font-weight:900;}
+  .opsign.add{color:var(--green);}
+  .opsign.sub{color:var(--orange);}
+  .opChoices{display:flex;gap:14px;justify-content:center;margin-top:8px;flex-wrap:wrap;}
+  .opBtn{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:150px;padding:20px 14px;border-radius:18px;border:3px solid var(--line);
+    background:#fff;font-weight:900;font-size:18px;color:var(--ink);cursor:pointer;box-shadow:0 3px 10px var(--shadowS);transition:transform .1s;}
+  .opBtn:active{transform:translateY(2px);}
+  .opBtn .opIc{font-size:40px;}
+  .opBtn.opAdd{border-color:#bfe6c8;} .opBtn.opAdd .opIc{color:var(--green);}
+  .opBtn.opSub{border-color:#f3d6b3;} .opBtn.opSub .opIc{color:var(--orange);}
+  .opBtn.correct{border-color:var(--good);background:#eafaf1;}
+  .opBtn.wrong{border-color:#f3b3b3;background:#fdf0f0;opacity:.7;}
+  .numBtn.hintReveal{border-color:var(--good);background:#eafaf1;box-shadow:0 0 0 4px rgba(28,158,87,.35);animation:pop .4s;}
+
+  /* visible focus for keyboard / switch access */
+  button:focus-visible, .choice:focus-visible, .tile:focus-visible, .unit:focus-visible, .opt:focus-visible{
+    outline:4px solid #1f6fe0; outline-offset:3px; }
 </style>
 </head>
 <body>
@@ -302,8 +323,8 @@
     <div class="pill"><span class="ico">⭐</span><span id="starCount">0</span></div>
     <div class="pill"><span class="ico">⚾</span><span id="runCount">0</span></div>
     <div class="spacer"></div>
-    <button class="iconbtn" id="parentBtn" title="grown-ups">👪</button>
-    <button class="iconbtn" id="muteBtn" title="sound">🔊</button>
+    <button class="iconbtn" id="parentBtn" title="grown-ups" aria-label="For grown-ups">👪</button>
+    <button class="iconbtn" id="muteBtn" title="sound" aria-label="Sound on or off">🔊</button>
   </div>
 
   <!-- HOME -->
@@ -356,7 +377,7 @@
 const SAVE_KEY="richitAllStar_v1";
 let state=loadState(), muted=false, currentTopic=null, lesson=null;
 function loadState(){ try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) return Object.assign(base(),s);}catch(e){} return base(); }
-function base(){ return {stars:0, runs:0, basePos:0, team:[], done:{}, log:{}, seen:{}, stats:{}, voice:null, mathLevel:{add:1,sub:1}, mlc:{}, mathUnlock:{}}; }
+function base(){ return {stars:0, runs:0, basePos:0, team:[], done:{}, log:{}, seen:{}, stats:{}, voice:null, mathLevel:{add:1,sub:1}, mlc:{}, mathUnlock:{}, errpat:{}, hints:{}, replays:0, opStat:{}, settings:{}}; }
 function saveState(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(e){} }
 
 /* ===================== SPEECH ===================== */
@@ -570,7 +591,7 @@ function renderStep(){
 function coachHTML(text){
   return `<div class="coach"><span class="face">🦉</span><span class="bubble">${text}</span><button class="listen" id="listenBtn">🔊 Listen</button></div>`;
 }
-function bindListen(fn){ const b=$("listenBtn"); if(b) b.onclick=fn; }
+function bindListen(fn){ const b=$("listenBtn"); if(b){ b.setAttribute("aria-label","Listen again"); b.onclick=()=>{ state.replays=(state.replays||0)+1; saveState(); fn(); }; } }
 
 /* ---- PHONICS: Learn ---- */
 function rLearnPhon(){
@@ -583,8 +604,20 @@ function rLearnPhon(){
     $("hb").onclick=()=>speak(w.word);
     bindListen(()=>speak("This word is "+w.word));
     speak("This word is "+w.word);
+  } else if(lesson.topic && lesson.topic.sub==="letter"){
+    const L=w.word.toUpperCase(), snd=phon(w.sounds[0]);
+    const coachTxt=`The letter ${L} says "${snd}".`+(w.label?` ${w.label} starts with that sound.`:"");
+    body.innerHTML=coachHTML(coachTxt)+
+      `<div class="card"><div class="bigEmoji">${w.ic||"⭐"}</div>
+        <div class="bigword">${L} ${w.word}</div>
+        ${w.label?`<div class="label">${w.label}</div>`:""}
+        <button class="speakBtn" id="blend">🔊 Hear the sound</button></div>
+       <button class="footerBtn" id="nx">Got it! ⭐</button>`;
+    $("blend").onclick=()=>speak(`${L} says ${snd}.`+(w.label?` ${w.label}.`:""),{rate:.8});
+    bindListen(()=>speak(coachTxt));
+    speak(coachTxt,{rate:.9});
   } else {
-    const sndHTML=w.sounds.map(s=>`<button class="sbtn" data-s="${s}">${s}</button>`).join("");
+    const sndHTML=w.sounds.map(s=>`<button class="sbtn" data-s="${s}" aria-label="sound ${s}">${s}</button>`).join("");
     body.innerHTML=coachHTML("Tap each sound. Then blend them together.")+
       `<div class="card"><div class="bigEmoji">${w.ic||"⭐"}</div>
         <div class="sounds">${sndHTML}</div>
@@ -807,18 +840,47 @@ function genMath(op,level){
 }
 function level2Unlocked(id){ return (state.mlc[id+"|1"]||0)>=MATH_MASTER || !!(state.mathUnlock&&state.mathUnlock[id]); }
 function makeNumChoices(it){
-  const ans=it.ans, lvl=it.level||1;
-  const cands = lvl===2 ? [ans+1,ans-1,ans+2,ans-2,ans+10,ans-10,ans+11] : [ans+1,ans-1,ans+2,ans-2,ans+3];
+  const ans=it.ans, lvl=it.level||1, add=it.op==="add";
+  // Intentional "tempting" distractors: the sum on subtraction, the difference on
+  // addition (common operation confusion), plus off-by-one. Then fill from a wider band.
+  const tempting = add ? [Math.abs(it.a-it.b), ans+1, ans-1] : [it.a+it.b, ans+1, ans-1];
+  const filler = lvl===2 ? [ans+2,ans-2,ans+10,ans-10,ans+11] : [ans+2,ans-2,ans+3];
   const set=new Set([ans]);
-  for(const c of shuffle(cands)){ if(set.size>=3)break; if(c>=0&&c!==ans) set.add(c); }
-  while(set.size<3){ const r=ans+(rand(11)-5); if(r>=0&&r!==ans) set.add(r); }
+  for(const c of [...tempting, ...shuffle(filler)]){ if(set.size>=4)break; if(c>=0&&c!==ans) set.add(c); }
+  while(set.size<4){ const r=ans+(rand(13)-6); if(r>=0&&r!==ans) set.add(r); }
   return shuffle([...set]);
 }
-function makeBlock(cls){ return elc("button","counter "+cls); }
+/* ---- error patterns + hint ladder (for IEP notes) ---- */
+function classifyError(it,chosen){
+  const add=it.op==="add";
+  if(!add && chosen===it.a+it.b) return "sumOnSub";        // chose the sum instead of the difference
+  if(add && chosen===Math.abs(it.a-it.b)) return "diffOnAdd";
+  if(Math.abs(chosen-it.ans)===1) return "offByOne";
+  return "other";
+}
+function recordError(id,type){ const k=id+"|"+type; state.errpat[k]=(state.errpat[k]||0)+1; saveState(); }
+function recordHint(id,level){ const k=id+"|h"+level; state.hints[k]=(state.hints[k]||0)+1; saveState(); }
+function hintLadder(it,container){
+  lesson._wrong=(lesson._wrong||0)+1; const add=it.op==="add", enc=$("enc");
+  if(lesson._wrong===1){
+    if(enc)enc.textContent = add?"Let's look again — we put them together. ➕":"Let's look again — this one says take away. ➖";
+    speak(add?"Let's look again. We put them together.":"Let's look again. This one says take away.");
+  } else if(lesson._wrong===2){
+    if(enc)enc.textContent="Watch the blocks… 👀";
+    const a=$("auto"); if(a){ a.click(); } else speak("Count them carefully.");
+  } else {
+    const right=[...container.querySelectorAll(".numBtn")].find(b=>+b.textContent===it.ans);
+    if(right) right.classList.add("hintReveal");
+    if(enc)enc.textContent=`${it.a} ${add?'+':'–'} ${it.b} = ${it.ans}`;
+    speak(add?`${it.a} put together with ${it.b} makes ${it.ans}.`:`${it.a} take away ${it.b} leaves ${it.ans}.`);
+  }
+  recordHint(lesson.id, lesson._wrong);
+}
+function makeBlock(cls){ const b=elc("button","counter "+cls); b.setAttribute("aria-label","block"); return b; }
 function baseTenGroup(n,cls){
   const wrap=elc("div","btgroup");
-  for(let i=0;i<Math.floor(n/10);i++) wrap.appendChild(elc("button","rod "+cls));
-  for(let i=0;i<n%10;i++) wrap.appendChild(elc("button","one "+cls));
+  for(let i=0;i<Math.floor(n/10);i++){ const r=elc("button","rod "+cls); r.setAttribute("aria-label","ten block"); wrap.appendChild(r); }
+  for(let i=0;i<n%10;i++){ const o=elc("button","one "+cls); o.setAttribute("aria-label","one block"); wrap.appendChild(o); }
   return wrap;
 }
 function tallyMarksHTML(n,cls,crossFrom){
@@ -845,17 +907,46 @@ function answerNum(btn,chosen,it,container){
     setTimeout(nextStep,950);
   } else {
     btn.classList.add("wrong"); btn.dataset.locked=1; bumpStat(lesson.id,false);
-    const enc=$("enc"); if(enc)enc.textContent="Try again — count carefully! 🌟";
+    recordError(lesson.id, classifyError(it,chosen));
+    hintLadder(it,container);
   }
 }
 function mathChoices(it){
   const opts=$("opts");
-  makeNumChoices(it).forEach(v=>{ const btn=elc("button","numBtn"); btn.textContent=v; btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn); });
+  makeNumChoices(it).forEach(v=>{ const btn=elc("button","numBtn"); btn.textContent=v; btn.setAttribute("aria-label",v+""); btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn); });
+}
+
+/* ---- Operation-recognition pre-step: "What are we doing?" ---- */
+const OP_META={ add:{label:"Put together",ic:"➕",cls:"opAdd"}, sub:{label:"Take away",ic:"➖",cls:"opSub"} };
+function rOpStep(it,done){
+  const add=it.op==="add", body=$("actBody");
+  const q = add?"Are we putting together or taking away?":"Are we adding more, or taking away?";
+  body.innerHTML = coachHTML("What are we doing?")+
+    `<div class="card"><div class="mathEq big">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b}</div>
+      <div class="prompt">${q} Look at the sign.</div>
+      <div class="opChoices" id="opc"></div>
+      <div class="encourage" id="enc"></div></div>`;
+  const oc=$("opc");
+  shuffle(["add","sub"]).forEach(op=>{
+    const m=OP_META[op], b=elc("button","opBtn "+m.cls); b.setAttribute("aria-label",m.label);
+    b.innerHTML=`<span class="opIc">${m.ic}</span><span>${m.label}</span>`;
+    b.onclick=()=>{
+      if(b.dataset.locked)return;
+      if(op===it.op){ b.classList.add("correct"); state.opStat[lesson.id+"|ok"]=(state.opStat[lesson.id+"|ok"]||0)+1; saveState(); speak(add?"Put together!":"Take away!"); setTimeout(done,700); }
+      else { b.classList.add("wrong"); b.dataset.locked=1; recordError(lesson.id,"opConfusion"); $("enc").textContent="Look at the sign. 👀"; speak(add?"This sign means put together.":"This sign means take away."); }
+    };
+    oc.appendChild(b);
+  });
+  bindListen(()=>speak(q+" Look at the sign."));
+  speak("What are we doing? "+q,{rate:.9});
 }
 
 function renderMath(){
   const it=lesson.items[lesson.idx], k=lesson.kind;
+  lesson._wrong=0;
   if(k==="numberline") return rMathLine(it);
+  if(state.settings && state.settings.opStep===false){} // parent can turn it off
+  else if(!it._opShown){ return rOpStep(it,()=>{ it._opShown=true; renderMath(); }); }
   if(k==="quiz") return rMathQuiz(it);
   if(k==="tally") return rMathTally(it);
   return (it.level===2) ? rMathBaseTen(it) : rMathSticks(it);
@@ -869,7 +960,7 @@ function rMathSticks(it){
     : `You have ${it.a}. Take away ${it.b}. Tap ${it.b} blocks to take them away.`;
   body.innerHTML = coachHTML(coachTxt)+
     `<div class="card mathCard">
-      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="mathEq">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b} = <span class="qm">?</span></div>
       <div class="counters" id="counters"></div>
       <div class="countTotal" id="ctot"></div>
       <button class="btnMini" id="auto">${add?'👀 Count for me':'👀 Show me'}</button>
@@ -907,7 +998,7 @@ function rMathBaseTen(it){
     : `You have ${it.a}. Take away ${it.b}. Cross out ${bt} ten${bt===1?'':'s'} and ${bo} one${bo===1?'':'s'}.`;
   body.innerHTML = coachHTML(coachTxt)+
     `<div class="card mathCard">
-      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="mathEq">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b} = <span class="qm">?</span></div>
       <div class="counters bt" id="counters"></div>
       <div class="countTotal" id="ctot"></div>
       <button class="btnMini" id="auto">${add?'👀 Count for me':'👀 Show me'}</button>
@@ -944,7 +1035,7 @@ function rMathTally(it){
     : `Some marks are crossed out — those are taken away. Count the marks that are left.`;
   body.innerHTML = coachHTML(coachTxt)+
     `<div class="card">
-      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="mathEq">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b} = <span class="qm">?</span></div>
       <div class="tallies" id="tw"></div>
       <div class="countTotal" id="ctot">Count: 0</div>
       <button class="btnMini" id="auto">👀 Count by 5s</button>
@@ -982,7 +1073,7 @@ function rMathLine(it){
     : `Start at ${it.a}. Hop back ${it.b}${lvl2?' — use tens and ones!':' times!'}`;
   body.innerHTML = coachHTML(coachTxt)+
     `<div class="card">
-      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="mathEq">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b} = <span class="qm">?</span></div>
       <div class="numline" id="nl"></div>
       <div class="prompt">Left to hop: <b id="hopn">${it.b}</b></div>
       <div class="hopBtns" id="hopBtns"></div>
@@ -1018,7 +1109,7 @@ function rMathQuiz(it){
   const add=it.op==="add", body=$("actBody");
   body.innerHTML = coachHTML("What is the answer?")+
     `<div class="card">
-      <div class="mathEq big">${it.a} ${add?'+':'–'} ${it.b} = ?</div>
+      <div class="mathEq big">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b} = ?</div>
       <div class="counters small" id="counters"></div>
       <div class="numChoices" id="opts"></div>
       <div class="encourage" id="enc"></div>
@@ -1152,6 +1243,9 @@ function openParent(){
     <div class="pcard"><div style="font-weight:900;font-size:16px;margin-bottom:4px">Accuracy by skill (for IEP notes)</div>
       <table><tr><th>Skill</th><th>Plays</th><th>Tries</th><th>Right</th><th>Accuracy</th></tr>${rowsHTML}</table></div>
 
+    <div class="pcard"><div style="font-weight:900;font-size:16px;margin-bottom:4px">Patterns I'm noticing 🔎</div>
+      ${(function(){const ins=mathInsights(); return ins.length?ins.map(s=>`<div class="note" style="margin:4px 0">• ${s}</div>`).join(""):'<div class="note">Not enough data yet — these notes appear once Richit has practiced math a bit. They\'re great for IEP meetings.</div>';})()}</div>
+
     <div class="pcard"><div style="font-weight:900;font-size:16px">Last 2 weeks</div>
       <div class="note">Richit practiced on <b>${active}</b> ${active===1?'day':'days'}. Every day is a bonus, never a must. 🌟</div>
       <div class="cal">${cal}</div></div>
@@ -1182,6 +1276,33 @@ function openParent(){
   show("parentScreen");
 }
 
+/* ===================== INSIGHTS + CONTENT VALIDATION ===================== */
+function mathInsights(){
+  const out=[];
+  [["add","Addition"],["sub","Subtraction"]].forEach(([id,nm])=>{
+    const sum=state.errpat[id+"|sumOnSub"]||0, diff=state.errpat[id+"|diffOnAdd"]||0;
+    const opc=state.errpat[id+"|opConfusion"]||0, off=state.errpat[id+"|offByOne"]||0;
+    const model=(state.hints[id+"|h2"]||0)+(state.hints[id+"|h3"]||0);
+    if(id==="sub"&&sum>=3) out.push(`${nm}: sometimes picks the sum instead of taking away (${sum}×).`);
+    if(id==="add"&&diff>=3) out.push(`${nm}: sometimes takes away instead of adding (${diff}×).`);
+    if(opc>=3) out.push(`${nm}: mixes up the +/− sign (${opc}×) — the "What are we doing?" step targets this.`);
+    if(model>=3) out.push(`${nm}: does better with the visual model — needed "show me" ${model}×.`);
+    if(off>=3) out.push(`${nm}: often off by one (${off}×) — likely a counting slip, not a concept gap.`);
+  });
+  if((state.replays||0)>=8) out.push(`Uses the Listen button a lot (${state.replays}×) — answers better when the instruction is repeated.`);
+  return out;
+}
+function validateContent(){
+  if(typeof TOPICS==="undefined") return;
+  const ok=[];
+  TOPICS.forEach(t=>{
+    if(!t||!t.id||!t.name||!t.type){ console.warn("All-Star: skipping malformed topic", t); return; }
+    if(t.type!=="math" && (!Array.isArray(t.items)||!t.items.length)){ console.warn("All-Star: topic has no items, skipping", t.id); return; }
+    ok.push(t);
+  });
+  TOPICS.length=0; ok.forEach(t=>TOPICS.push(t));
+}
+
 /* ===================== WIRING ===================== */
 $("startBtn").onclick=startApp;
 $("landingParent").onclick=()=>{ startApp(); openParentGate(); };
@@ -1195,6 +1316,7 @@ $("actBack").onclick=()=>{ stopRec(); stopSpeak(); if(currentTopic) openTopic(cu
 let warmed=false;
 document.addEventListener("pointerdown",()=>{ if(!warmed&&'speechSynthesis'in window){ const u=new SpeechSynthesisUtterance(" "); u.volume=0; try{speechSynthesis.speak(u);}catch(e){} warmed=true; pickVoice(); } });
 
+validateContent();
 showLanding();
 </script>
 <script>
