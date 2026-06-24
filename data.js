@@ -355,3 +355,20 @@ const MATH = [
   { id:"sub", name:"Subtraction", emoji:"➖", type:"math", op:"sub", color:"orange", count:10 },
 ];
 TOPICS.push(...MATH);
+
+/* Word clues — which words mean "put together" vs "take away" */
+const WORDCLUES = { id:"wordclue", name:"Word Clues", emoji:"🔤", type:"wordclue", color:"teal", items:[
+  {word:"altogether",op:"add"},{word:"in all",op:"add"},{word:"plus",op:"add"},{word:"more",op:"add"},{word:"and",op:"add"},{word:"total",op:"add"},
+  {word:"take away",op:"sub"},{word:"left",op:"sub"},{word:"minus",op:"sub"},{word:"fewer",op:"sub"},{word:"how many more",op:"sub"},{word:"gone",op:"sub"},
+]};
+TOPICS.push(WORDCLUES);
+
+/* AAC board + repair phrases */
+const AAC_CORE = [
+  {t:"I want this",ic:"🙋"},{t:"Help, please",ic:"🆘"},{t:"More, please",ic:"➕"},
+  {t:"I'm all done",ic:"✅"},{t:"I need a break",ic:"🪑"},{t:"It's too loud",ic:"🔊"},
+  {t:"I need the bathroom",ic:"🚽"},{t:"Yes, please",ic:"👍"},{t:"No, thank you",ic:"👎"},
+];
+const AAC_REPAIR = [
+  {t:"I don't know",ic:"🤷"},{t:"Say it again",ic:"🔁"},{t:"Show me",ic:"👀"},{t:"Help me",ic:"🤝"},
+];

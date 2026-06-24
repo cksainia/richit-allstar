@@ -304,6 +304,22 @@
   /* visible focus for keyboard / switch access */
   button:focus-visible, .choice:focus-visible, .tile:focus-visible, .unit:focus-visible, .opt:focus-visible{
     outline:4px solid #1f6fe0; outline-offset:3px; }
+
+  /* ===== batch 2: plan, break, AAC, sensory ===== */
+  .planBtn{background:rgba(255,255,255,.92);color:#2f63b8;border:none;border-radius:16px;padding:13px 26px;font-size:17px;font-weight:900;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.14);margin-top:10px;}
+  .planBtn:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.14);}
+  .planBar{background:#fff4d6;border:1px solid #f0d98a;border-radius:12px;padding:8px 12px;font-weight:800;font-size:14px;color:#7a5a10;text-align:center;margin-top:8px;}
+  .breakFab{position:fixed;bottom:18px;right:18px;z-index:35;background:#7fb8ec;color:#0b2e52;border:none;border-radius:999px;padding:14px 20px;font-size:16px;font-weight:900;box-shadow:0 6px 18px rgba(26,40,70,.3);cursor:pointer;}
+  .breakFab:active{transform:scale(.95);}
+  .aacGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:8px;}
+  .aacBtn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 10px;border-radius:18px;border:2px solid var(--line);background:#fff;font-weight:800;font-size:15px;color:var(--ink);cursor:pointer;box-shadow:0 2px 10px var(--shadowS);min-height:104px;justify-content:center;text-align:center;}
+  .aacBtn:active{transform:translateY(2px);}
+  .aacBtn .aacIc{font-size:34px;}
+  .overlay.calm{background:rgba(18,28,48,.3);backdrop-filter:none;}
+  .overlay.calm .rewardCard{animation:none;}
+  .overlay.calm .grow{animation:none;}
+  body.reduce-motion *{animation:none !important; transition:none !important;}
+  body.reduce-motion .confetti{display:none !important;}
 </style>
 </head>
 <body>
@@ -315,6 +331,7 @@
       <h1 class="landingTitle">Richit's<br>All-Star Field</h1>
       <div class="landingTag">Read a little · score a run · fill your field ⭐</div>
       <button class="playBtn" id="startBtn">▶️ Let's Play!</button>
+      <button class="planBtn" id="startPlan">📋 Today's Plan (10 min)</button>
       <button class="grownBtn" id="landingParent">👪 For grown-ups</button>
     </div>
   </div>
@@ -357,9 +374,11 @@
   <!-- ACTIVITY -->
   <div class="screen hidden" id="actScreen">
     <button class="backBtn" id="actBack">⬅️ Back</button>
+    <div class="planBar hidden" id="planBar"></div>
     <div class="dots" id="dots" style="margin-top:12px;"></div>
     <div id="actBody"></div>
   </div>
+  <button class="breakFab hidden" id="breakFab" aria-label="Take a break">🧘 Break</button>
 
   <!-- PARENT -->
   <div class="screen hidden" id="parentScreen">
@@ -394,7 +413,8 @@ function speak(text,opts){
   if(muted||!('speechSynthesis'in window)||!text)return;
   try{ speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text);
-    u.lang="en-US"; if(enVoice)u.voice=enVoice; u.rate=opts.rate||0.9; u.pitch=opts.pitch||1.05;
+    const q=state.settings&&state.settings.quiet;
+    u.lang="en-US"; if(enVoice)u.voice=enVoice; u.rate=opts.rate||(q?0.85:0.9); u.pitch=opts.pitch||1.05; u.volume=q?0.6:1;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -410,7 +430,15 @@ function phon(s){ return PH[s.toLowerCase()]||s; }
 /* ===================== HELPERS ===================== */
 const $=id=>document.getElementById(id);
 const elc=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
-function show(s){ ["homeScreen","menuScreen","actScreen","parentScreen"].forEach(x=>$(x).classList.add("hidden")); $(s).classList.remove("hidden"); $(s).scrollTop=0; }
+function show(s){ ["homeScreen","menuScreen","actScreen","parentScreen"].forEach(x=>$(x).classList.add("hidden")); $(s).classList.remove("hidden"); $(s).scrollTop=0;
+  const fab=$("breakFab"); if(fab){ const showFab = s==="actScreen" && (!state.settings || state.settings.breakBtn!==false); fab.classList.toggle("hidden", !showFab); } }
+function applySettings(){ document.body.classList.toggle("reduce-motion", !!(state.settings && state.settings.reduceMotion)); }
+function openBreak(){ stopSpeak();
+  const ov=elc("div","overlay"); ov.innerHTML=`<div class="rewardCard"><div class="breathe">Breathe…</div>
+    <div style="font-weight:800;font-size:16px;margin-top:4px">In… and out…</div>
+    <button class="footerBtn" style="margin-top:16px" id="brDone">I feel calm 😌</button></div>`;
+  document.body.appendChild(ov); speak("Let's take a break. Breathe in. And out.",{rate:.78});
+  ov.querySelector("#brDone").onclick=()=>{ ov.remove(); }; }
 function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1500); }
 function todayKey(d){ d=d||new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -467,7 +495,7 @@ function topicProgress(t){
 }
 const SECTIONS=[
   {key:"reading", label:"📖 Reading", ids:["letters","cvc_a","cvc_e","cvc_i","cvc_o","cvc_u","digraphs","blends","sight1","sight2","stories"]},
-  {key:"math", label:"🔢 Math", ids:["add","sub"]},
+  {key:"math", label:"🔢 Math", ids:["add","sub","wordclue"]},
   {key:"talking", label:"💬 Talking", ids:["comm_want","comm_comment","comm_problem","comm_social","directions"]},
   {key:"feelings", label:"😊 Feelings", ids:["feelings"]},
   {key:"convos", label:"🎭 Conversations", scripts:true},
@@ -502,6 +530,11 @@ function renderTiles(){
         <div class="bar"><i style="width:${pct}%"></i></div>`;
       wrap.appendChild(b);
     });
+    if(sec.key==="talking"){
+      const b=elc("button","unit c-purple"); b.onclick=showAACBoard;
+      b.innerHTML=`<span class="emoji">🗣️</span><span class="name">My Words</span><div class="prog">Tap to talk</div>`;
+      wrap.appendChild(b);
+    }
   }
 }
 function renderHome(){ renderTabs(); renderTiles(); }
@@ -526,6 +559,7 @@ const ACTIVITY_SETS={
   read:[{k:"read",big:"📚",t:"Read & Answer",d:"Listen to a story, answer who & what"}],
   directions:[{k:"do",big:"👂",t:"Listen & Do",d:"Do what you hear"}],
   feelings:[{k:"feel",big:"😊",t:"Name the Feeling",d:"How do they feel? Then get calm"}],
+  wordclue:[{k:"sort",big:"🔤",t:"Add or Take Away?",d:"Which word tells us?"}],
 };
 function mathLevelChooser(id){
   const cur=state.mathLevel[id]||1, unlocked=level2Unlocked(id), prog=Math.min(state.mlc[id+"|1"]||0, MATH_MASTER);
@@ -560,14 +594,17 @@ function openTopic(id){
 }
 
 /* ===================== ACTIVITY ENGINE ===================== */
-function startActivity(id,kind){
+function startActivity(id,kind,len){
   const t=TOPICS.find(x=>x.id===id);
   const lvl = t.type==="math" ? (state.mathLevel[id]||1) : 1;
-  const items = t.type==="math"
+  let items = t.type==="math"
     ? Array.from({length:t.count||10},()=>genMath(t.op,lvl))
     : shuffle(t.items);
+  if(len) items = items.slice(0,len);
   lesson={id,kind,type:t.type,items,idx:0,correct:0,topic:t,level:lvl};
   const s=state.stats[id]||(state.stats[id]={a:0,c:0,sess:0}); s.sess++; saveState();
+  const pb=$("planBar");
+  if(pb){ if(plan){ pb.textContent=`📋 Step ${plan.i+1} of ${PLAN.length}  →  then ⚾`; pb.classList.remove("hidden"); } else pb.classList.add("hidden"); }
   renderDots(); renderStep(); show("actScreen");
 }
 function renderDots(){
@@ -587,6 +624,7 @@ function renderStep(){
   else if(lesson.type==="directions"){ rDirections(); }
   else if(lesson.type==="feelings"){ rFeelings(); }
   else if(lesson.type==="math"){ renderMath(); }
+  else if(lesson.type==="wordclue"){ rWordClue(lesson.items[lesson.idx]); }
 }
 function coachHTML(text){
   return `<div class="coach"><span class="face">🦉</span><span class="bubble">${text}</span><button class="listen" id="listenBtn">🔊 Listen</button></div>`;
@@ -914,6 +952,79 @@ function answerNum(btn,chosen,it,container){
 function mathChoices(it){
   const opts=$("opts");
   makeNumChoices(it).forEach(v=>{ const btn=elc("button","numBtn"); btn.textContent=v; btn.setAttribute("aria-label",v+""); btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn); });
+  guardAnswers();
+}
+function guardAnswers(){
+  if(!(state.settings&&state.settings.guided))return;
+  if(lesson.kind==="quiz"||lesson.kind==="numberline")return;
+  const opts=$("opts"); if(!opts)return;
+  opts.style.pointerEvents="none"; opts.style.opacity=".4";
+  const hint=elc("div","note"); hint.id="guardHint"; hint.style.textAlign="center"; hint.style.fontWeight="800"; hint.textContent="Count or tap the blocks first 👆";
+  opts.parentNode.insertBefore(hint,opts);
+  const unlock=()=>{ opts.style.pointerEvents=""; opts.style.opacity=""; const h=$("guardHint"); if(h)h.remove(); };
+  ["counters","tw"].forEach(idd=>{ const el=$(idd); if(el) el.addEventListener("click",unlock,{once:true}); });
+  const a=$("auto"); if(a) a.addEventListener("click",unlock,{once:true});
+}
+/* ---- Word Clues: which word means put together vs take away ---- */
+function rWordClue(it){
+  const body=$("actBody");
+  body.innerHTML=coachHTML(`The word is "${it.word}". Does it mean put together, or take away?`)+
+    `<div class="card"><div class="mathEq big">"${it.word}"</div>
+      <div class="prompt">Which one is it? Pick the colour.</div>
+      <div class="opChoices" id="opc"></div><div class="encourage" id="enc"></div></div>`;
+  const oc=$("opc");
+  shuffle(["add","sub"]).forEach(op=>{ const m=OP_META[op], b=elc("button","opBtn "+m.cls); b.setAttribute("aria-label",m.label);
+    b.innerHTML=`<span class="opIc">${m.ic}</span><span>${m.label}</span>`;
+    b.onclick=()=>{ if(b.dataset.locked)return;
+      if(op===it.op){ b.classList.add("correct"); bumpStat(lesson.id,true); lesson.correct++; markSeen("word: "+it.word); speak(op==="add"?"Yes — put together!":"Yes — take away!"); setTimeout(nextStep,800); }
+      else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Let's look again."; speak(`The word ${it.word} means `+(it.op==="add"?"put together.":"take away.")); }
+    };
+    oc.appendChild(b);
+  });
+  bindListen(()=>speak(`The word is ${it.word}. Does it mean put together, or take away?`));
+  speak(`The word is ${it.word}.`,{rate:.9});
+}
+/* ---- AAC board (My Words) ---- */
+function showAACBoard(){
+  currentTopic=null;
+  const all=[...AAC_CORE, ...(state.myWords||[]), ...AAC_REPAIR];
+  const ms=$("menuScreen");
+  ms.innerHTML=`<button class="backBtn" id="aacBack">⬅️ Field</button>
+    <h1 style="margin-top:10px">🗣️ My Words</h1>
+    <div class="sub">Tap a word to say it out loud</div>
+    <div class="aacGrid">`+
+    all.map((w,i)=>`<button class="aacBtn" data-i="${i}" aria-label="${(w.t||'').replace(/"/g,'')}"><span class="aacIc">${w.ic||'💬'}</span><span>${w.t||''}</span></button>`).join("")+
+    `</div>`;
+  show("menuScreen");
+  ms.querySelector("#aacBack").onclick=goHome;
+  ms.querySelectorAll(".aacBtn").forEach((b,i)=>b.onclick=()=>speak(all[i].t,{rate:.9}));
+}
+/* ---- Daily plan: a short, finite, mixed session ---- */
+const PLAN=[
+  {id:"cvc_a",k:"find",len:2},
+  {id:"add",k:"sticks",len:2},
+  {id:"wordclue",k:"sort",len:2},
+  {id:"comm_want",k:"choose",len:2},
+  {id:"sub",k:"tally",len:2},
+  {id:"stories",k:"read",len:1},
+  {id:"feelings",k:"feel",len:1},
+];
+let plan=null;
+function startPlan(){ $("landingScreen").classList.add("hidden"); $("topbar").classList.remove("hidden"); plan={i:0}; runPlanStep(); }
+function runPlanStep(){
+  if(!plan) return;
+  if(plan.i>=PLAN.length){ plan=null; return planComplete(); }
+  const s=PLAN[plan.i]; startActivity(s.id,s.k,s.len);
+}
+function planComplete(){
+  const pb=$("planBar"); if(pb)pb.classList.add("hidden");
+  addStars(2); saveState(); renderTop();
+  const ov=elc("div","overlay"); ov.innerHTML=`<div class="rewardCard"><div class="grow">🏅</div>
+    <h2>Plan complete!</h2><div style="font-size:17px;font-weight:800;margin:6px 0">Great 10 minutes, Richit! ⚾</div>
+    <button class="footerBtn" style="margin-top:14px" id="pcDone">Back to the Field 🏟️</button></div>`;
+  document.body.appendChild(ov); speak("You finished today's plan! Great job!");
+  if(!(state.settings&&(state.settings.reduceMotion||state.settings.calm))) burstConfetti();
+  ov.querySelector("#pcDone").onclick=()=>{ ov.remove(); goHome(); };
 }
 
 /* ---- Operation-recognition pre-step: "What are we doing?" ---- */
@@ -1177,21 +1288,27 @@ function playScript(id){
 /* ===================== REWARD OVERLAY ===================== */
 function showReward(earned){
   saveState(); renderTop();
-  const ov=elc("div","overlay");
+  const calm = state.settings&&state.settings.calm;
+  const ov=elc("div","overlay"+(calm?" calm":""));
   const scored = state.basePos===0; // just crossed home
+  let btns;
+  if(plan){ const last=plan.i>=PLAN.length-1; btns=`<button class="footerBtn" style="margin-top:14px" id="rwNext">${last?'Finish 🎉':'Next ▶️'}</button>`; }
+  else { btns=`<button class="footerBtn" style="margin-top:14px" id="rwHome">Back to the Field 🏟️</button>
+    <button class="backBtn" style="margin-top:10px" id="rwAgain">▶️ Play again</button>`; }
   ov.innerHTML=`<div class="rewardCard">
     <div class="grow">${scored?"⚾":"⭐"}</div>
     <h2>${cheer()}</h2>
     <div style="font-size:17px;font-weight:800;margin:6px 0">${scored?"You scored a RUN! 🎉":"You earned "+earned+" stars! ⭐"}</div>
     <div class="pill" style="display:inline-flex;margin:8px auto">⭐ +${earned}</div><br>
-    <button class="footerBtn" style="margin-top:14px" id="rwHome">Back to the Field 🏟️</button>
-    <button class="backBtn" style="margin-top:10px" id="rwAgain">▶️ Play again</button>
-  </div>`;
+    ${btns}</div>`;
   document.body.appendChild(ov);
-  ov.querySelector("#rwHome").onclick=()=>{ ov.remove(); goHome(); };
-  ov.querySelector("#rwAgain").onclick=()=>{ ov.remove(); if(currentTopic) startActivity(lesson.id,lesson.kind); else goHome(); };
+  if(plan){ ov.querySelector("#rwNext").onclick=()=>{ ov.remove(); plan.i++; runPlanStep(); }; }
+  else {
+    ov.querySelector("#rwHome").onclick=()=>{ ov.remove(); goHome(); };
+    ov.querySelector("#rwAgain").onclick=()=>{ ov.remove(); if(currentTopic) startActivity(lesson.id,lesson.kind); else goHome(); };
+  }
   speak(scored?"You scored a run! "+cheer():cheer());
-  burstConfetti();
+  if(!(state.settings&&(state.settings.reduceMotion||state.settings.calm))) burstConfetti();
 }
 function burstConfetti(){
   const ems=["⭐","⚾","🎉","🌟","🏆","💫"];
@@ -1267,11 +1384,47 @@ function openParent(){
         <button class="vbtn ${level2Unlocked('sub')?'on':''}" id="ulSub">${level2Unlocked('sub')?'Subtraction L2 ✓':'Unlock Subtraction L2'}</button>
       </div></div>
 
+    <div class="pcard"><div style="font-weight:900;font-size:16px">Sensory & learning settings 🎛️</div>
+      <div class="vrow" id="setRow">
+        ${setToggle("opStep","Ask \"add or take away?\" first",1)}
+        ${setToggle("guided","Guided: count before answering",0)}
+        ${setToggle("reduceMotion","Reduce motion (no confetti)",0)}
+        ${setToggle("quiet","Quieter voice",0)}
+        ${setToggle("calm","Calm rewards (no big celebration)",0)}
+        ${setToggle("breakBtn","Always show Break button",1)}
+      </div>
+      <div class="note" style="margin-top:6px">These tailor the app to how Richit is feeling that day.</div></div>
+
+    <div class="pcard"><div style="font-weight:900;font-size:16px">My Words (his talk board) 🗣️</div>
+      <div class="note">Add favourite foods, toys, people, or school phrases. They appear on his My Words board.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <input id="mwIc" placeholder="emoji" style="width:64px;padding:10px;border-radius:10px;border:2px solid var(--line);font-size:18px;text-align:center">
+        <input id="mwText" placeholder="word or phrase, e.g. I want goldfish" style="flex:1;min-width:160px;padding:10px;border-radius:10px;border:2px solid var(--line)">
+        <button class="btnMini" id="mwAdd" style="margin:0">➕ Add</button>
+      </div>
+      <div class="chips" id="mwList">${(state.myWords||[]).map((w,i)=>`<span class="chip">${w.ic||'💬'} ${w.t} <b data-rm="${i}" style="cursor:pointer;color:#c33">✕</b></span>`).join("")||'<span class="note">No custom words yet.</span>'}</div></div>
+
+    <div class="pcard"><div style="font-weight:900;font-size:16px">Records & backup 📤</div>
+      <div class="vrow" style="margin-top:6px">
+        <button class="vbtn" id="expCSV">⬇️ Export CSV</button>
+        <button class="vbtn" id="printSum">🖨️ Printable summary</button>
+        <button class="vbtn" id="backup">💾 Backup (JSON)</button>
+        <button class="vbtn" id="restore">📥 Restore backup</button>
+      </div>
+      <input type="file" id="restoreFile" accept="application/json" style="display:none">
+      <div class="note" style="margin-top:6px">All progress lives on this device only. Back it up so a cleared browser doesn't wipe his history.</div></div>
+
     <button class="footerBtn" id="resetBtn" style="background:#e0697a;box-shadow:0 6px 0 #b34d5d">Reset all progress</button>`;
 
   $("ulAdd").onclick=()=>{ state.mathUnlock.add=true; saveState(); openParent(); };
   $("ulSub").onclick=()=>{ state.mathUnlock.sub=true; saveState(); openParent(); };
   $("parentBody").querySelectorAll("#vrow .vbtn").forEach(b=>{ if(b.dataset.v) b.onclick=()=>{ state.voice=b.dataset.v; saveState(); pickVoice(); speak("Hi Richit! This is my voice."); openParent(); }; });
+  $("parentBody").querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{ const k=b.dataset.set; const cur = state.settings[k]!==undefined?state.settings[k]:(b.dataset.def==="1"); state.settings[k]=!cur; saveState(); applySettings(); openParent(); });
+  $("mwAdd").onclick=()=>{ const t=$("mwText").value.trim(); if(!t)return; const ic=$("mwIc").value.trim()||"💬"; state.myWords=state.myWords||[]; state.myWords.push({t,ic}); saveState(); openParent(); };
+  $("parentBody").querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ state.myWords.splice(+b.dataset.rm,1); saveState(); openParent(); });
+  $("expCSV").onclick=exportCSV; $("printSum").onclick=printSummary; $("backup").onclick=backupJSON;
+  $("restore").onclick=()=>$("restoreFile").click();
+  $("restoreFile").onchange=e=>{ if(e.target.files[0]) restoreJSON(e.target.files[0]); };
   $("resetBtn").onclick=()=>{ if(confirm("Reset all of Richit's progress?")){ localStorage.removeItem(SAVE_KEY); state=loadState(); openParent(); } };
   show("parentScreen");
 }
@@ -1303,8 +1456,38 @@ function validateContent(){
   TOPICS.length=0; ok.forEach(t=>TOPICS.push(t));
 }
 
+/* ---- parent data tools ---- */
+function download(name,text,mime){
+  try{ const b=new Blob([text],{type:mime}); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+  catch(e){ alert("Couldn't export here — try opening the app in Chrome or Safari."); }
+}
+function statRowsForExport(){ const rows=[]; TOPICS.forEach(t=>{ const s=state.stats[t.id]; if(!s||!s.a)return; rows.push([t.name, s.sess||0, s.a, s.c, Math.round(100*s.c/s.a)]); }); return rows; }
+function exportCSV(){
+  let lines=[["Skill","Plays","Tries","Correct","Accuracy%"], ...statRowsForExport()];
+  lines.push([],["Patterns"]); mathInsights().forEach(i=>lines.push([i]));
+  lines.push([],["Stars",state.stars],["Runs",state.runs],["Skills practiced",Object.keys(state.seen).length],["Days practiced",Object.keys(state.log).length]);
+  const csv=lines.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  download("richit-progress-"+todayKey()+".csv", csv, "text/csv");
+}
+function backupJSON(){ download("richit-backup-"+todayKey()+".json", JSON.stringify(state), "application/json"); }
+function restoreJSON(file){ const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); state=Object.assign(base(),d); saveState(); applySettings(); toast("Backup restored ✅"); openParent(); }catch(e){ alert("That file wasn't a valid backup."); } }; r.readAsText(file); }
+function printSummary(){
+  const ins=mathInsights();
+  let body=`<h1>Richit — Progress Summary</h1><p>${new Date().toLocaleDateString()}</p><h2>Accuracy by skill</h2>`;
+  body+="<table border='1' cellpadding='6' style='border-collapse:collapse'><tr><th>Skill</th><th>Plays</th><th>Tries</th><th>Correct</th><th>Accuracy</th></tr>";
+  statRowsForExport().forEach(r=>body+=`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}%</td></tr>`);
+  body+="</table><h2>Patterns</h2>"+(ins.length?("<ul>"+ins.map(i=>`<li>${i}</li>`).join("")+"</ul>"):"<p>Not enough data yet.</p>");
+  body+=`<p>Stars ${state.stars} · Runs ${state.runs} · Skills practiced ${Object.keys(state.seen).length} · Days practiced ${Object.keys(state.log).length}</p>`;
+  const w2=window.open("","_blank");
+  if(w2){ w2.document.write(`<title>Richit Progress</title><body style="font-family:sans-serif;padding:24px;max-width:700px;margin:auto">${body}</body>`); w2.document.close(); setTimeout(()=>{try{w2.print();}catch(e){}},400); }
+  else { download("richit-summary-"+todayKey()+".html", `<body style="font-family:sans-serif;padding:24px">${body}</body>`, "text/html"); }
+}
+function setToggle(key,label,defOn){ const on = state.settings[key]!==undefined?state.settings[key]:!!defOn; return `<button class="vbtn ${on?'on':''}" data-set="${key}" data-def="${defOn?1:0}">${on?'✓ ':''}${label}</button>`; }
+
 /* ===================== WIRING ===================== */
 $("startBtn").onclick=startApp;
+$("startPlan").onclick=startPlan;
+$("breakFab").onclick=openBreak;
 $("landingParent").onclick=()=>{ startApp(); openParentGate(); };
 $("parentBtn").onclick=openParentGate;
 $("muteBtn").onclick=()=>{ muted=!muted; $("muteBtn").textContent=muted?"🔇":"🔊"; if(muted)stopSpeak(); else toast("Sound on 🔊"); };
@@ -1317,6 +1500,7 @@ let warmed=false;
 document.addEventListener("pointerdown",()=>{ if(!warmed&&'speechSynthesis'in window){ const u=new SpeechSynthesisUtterance(" "); u.volume=0; try{speechSynthesis.speak(u);}catch(e){} warmed=true; pickVoice(); } });
 
 validateContent();
+applySettings();
 showLanding();
 </script>
 <script>
