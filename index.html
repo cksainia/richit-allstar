@@ -940,8 +940,8 @@ function rMathBaseTen(it){
 function rMathTally(it){
   const add=it.op==="add", body=$("actBody");
   const coachTxt = add
-    ? `Count the tally marks by fives. ${it.a}, and ${it.b} more!`
-    : `Start with ${it.a}. The crossed marks are taken away. Count what's left by fives.`;
+    ? `Let's count the tally marks. Count by fives, then count the extra marks.`
+    : `Some marks are crossed out — those are taken away. Count the marks that are left.`;
   body.innerHTML = coachHTML(coachTxt)+
     `<div class="card">
       <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
@@ -999,7 +999,7 @@ function rMathLine(it){
       onMathCorrect(it);
       $("enc").textContent=`🎉 ${it.a} ${add?'+':'–'} ${it.b} = ${pos}`;
       speak(`We landed on ${pos}! ${it.a} ${add?'plus':'minus'} ${it.b} is ${pos}.`);
-      setTimeout(nextStep,1500);
+      setTimeout(nextStep,5000);
     }
   }
   if(lvl2){
