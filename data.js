@@ -345,3 +345,13 @@ const CHEERS = ["Great job!","You did it!","Awesome, Richit!","You're a star!","
 
 /* Team players unlocked as you score runs */
 const TEAM = ["🧢","⚾","🥎","🏆","🥇","🦅","🐯","🦁","🚀","🌟","🎯","💪"];
+
+/* ===================== MATHEMATICS =====================
+   Problems are generated on the fly so practice never runs out.
+   max = largest sum / starting number. Aligned to IEP: add & take
+   away with manipulatives, counting on, number line. */
+const MATH = [
+  { id:"add", name:"Addition", emoji:"➕", type:"math", op:"add", color:"green", max:10, count:6 },
+  { id:"sub", name:"Subtraction", emoji:"➖", type:"math", op:"sub", color:"pink",  max:10, count:6 },
+];
+TOPICS.push(...MATH);

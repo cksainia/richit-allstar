@@ -225,6 +225,37 @@
 
   /* center activity content so short activities don't sit at the very top on iPad */
   #actBody{max-width:680px;margin:0 auto;}
+
+  /* ===== Math ===== */
+  .mathEq{font-size:30px;font-weight:900;margin:2px 0 10px;letter-spacing:1px;}
+  .mathEq.big{font-size:42px;margin-bottom:16px;}
+  .mathEq .qm{color:var(--blue);}
+  .counters{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:8px auto 6px;max-width:540px;}
+  .counters.small{transform:scale(.8);margin:0 auto;}
+  .counter{width:34px;height:50px;border-radius:9px;border:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.14);transition:transform .12s,opacity .2s;}
+  .counter.g1{background:linear-gradient(160deg,#5aa0e6,#3f7fe0);}
+  .counter.g2{background:linear-gradient(160deg,#6cc96c,#48b463);}
+  .counter:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.14);}
+  .counter.counted{outline:4px solid var(--sun);outline-offset:2px;transform:translateY(-4px) scale(1.06);}
+  .counter.gone{opacity:.28;transform:scale(.8) rotate(8deg);box-shadow:none;position:relative;}
+  .counter.gone::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b23;font-size:24px;font-weight:900;}
+  .plusSign{font-size:30px;font-weight:900;color:var(--muted);padding:0 4px;}
+  .countTotal{font-size:24px;font-weight:900;color:var(--ink);margin:6px 0;}
+  .btnMini{border:none;background:var(--soft);color:var(--ink);font-weight:800;font-size:14px;padding:10px 16px;border-radius:13px;cursor:pointer;box-shadow:0 2px 8px var(--shadowS);margin-bottom:8px;}
+  .btnMini:active{transform:translateY(2px);}
+  .numChoices{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:6px;}
+  .numBtn{min-width:78px;font-size:30px;font-weight:900;padding:16px 10px;border-radius:16px;border:3px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;box-shadow:0 3px 10px var(--shadowS);transition:transform .1s;}
+  .numBtn:active{transform:translateY(2px);}
+  .numBtn.correct{border-color:var(--good);background:#eafaf1;}
+  .numBtn.wrong{border-color:#f3b3b3;background:#fdf0f0;opacity:.7;}
+
+  .numline{display:flex;overflow-x:auto;gap:0;padding:6px 4px 2px;justify-content:flex-start;-webkit-overflow-scrolling:touch;}
+  .nlcell{flex:0 0 auto;width:38px;text-align:center;}
+  .nlmark{height:26px;font-size:22px;line-height:26px;}
+  .nltick{height:14px;border-left:2px solid var(--line);width:0;margin:0 auto;}
+  .nlnum{font-size:15px;font-weight:800;color:var(--muted);margin-top:2px;}
+  .nlcell.here .nlnum{color:var(--blue);font-size:18px;}
+  .nlcell.here .nltick{border-color:var(--blue);}
 </style>
 </head>
 <body>
@@ -379,14 +410,16 @@ function renderWOTD(){
 }
 
 /* ===================== HOME ===================== */
+function topicCount(t){ return t.items ? t.items.length : (t.count||6); }
 function topicProgress(t){
   const s=state.stats[t.id]||{a:0,c:0};
-  const target=(t.items.length||5);
+  const target=topicCount(t);
   const done=Math.min(target, s.c);
   return Math.round(done/target*100);
 }
 const SECTIONS=[
   {key:"reading", label:"📖 Reading", ids:["letters","cvc_a","cvc_e","cvc_i","cvc_o","cvc_u","digraphs","blends","sight1","sight2","stories"]},
+  {key:"math", label:"🔢 Math", ids:["add","sub"]},
   {key:"talking", label:"💬 Talking", ids:["comm_want","comm_comment","comm_problem","comm_social","directions"]},
   {key:"feelings", label:"😊 Feelings", ids:["feelings"]},
   {key:"convos", label:"🎭 Conversations", scripts:true},
@@ -438,6 +471,9 @@ const ACTIVITY_SETS={
   comm:[{k:"learn",big:"📖",t:"Learn the Phrase",d:"See the picture, hear the words"},
         {k:"choose",big:"💬",t:"What Do I Say?",d:"Pick the phrase that fits"},
         {k:"say",big:"🎤",t:"Say It!",d:"Hear it, then record yourself"}],
+  math:[{k:"sticks",big:"🟦",t:"Count with Blocks",d:"Tap to add or take away"},
+        {k:"numberline",big:"📏",t:"Number Line",d:"Hop the frog to the answer"},
+        {k:"quiz",big:"⚡",t:"Quick Quiz",d:"Pick the answer"}],
   read:[{k:"read",big:"📚",t:"Read & Answer",d:"Listen to a story, answer who & what"}],
   directions:[{k:"do",big:"👂",t:"Listen & Do",d:"Do what you hear"}],
   feelings:[{k:"feel",big:"😊",t:"Name the Feeling",d:"How do they feel? Then get calm"}],
@@ -447,7 +483,7 @@ function openTopic(id){
   const ms=$("menuScreen");
   ms.innerHTML=`<button class="backBtn" id="menuBack">⬅️ Field</button>
     <h1 style="margin-top:10px">${t.emoji} ${t.name}</h1>
-    <div class="sub">${t.items.length} to practice • your pace, no rush</div>
+    <div class="sub">${topicCount(t)} to practice • your pace, no rush</div>
     <div id="menuActs" style="margin-top:6px"></div>`;
   ms.querySelector("#menuBack").onclick=goHome;
   const m=ms.querySelector("#menuActs");
@@ -463,7 +499,10 @@ function openTopic(id){
 /* ===================== ACTIVITY ENGINE ===================== */
 function startActivity(id,kind){
   const t=TOPICS.find(x=>x.id===id);
-  lesson={id,kind,type:t.type,items:shuffle(t.items),idx:0,correct:0,topic:t};
+  const items = t.type==="math"
+    ? Array.from({length:t.count||6},()=>genMath(t.op,t.max||10))
+    : shuffle(t.items);
+  lesson={id,kind,type:t.type,items,idx:0,correct:0,topic:t};
   const s=state.stats[id]||(state.stats[id]={a:0,c:0,sess:0}); s.sess++; saveState();
   renderDots(); renderStep(); show("actScreen");
 }
@@ -483,6 +522,7 @@ function renderStep(){
   else if(lesson.type==="read"){ rRead(); }
   else if(lesson.type==="directions"){ rDirections(); }
   else if(lesson.type==="feelings"){ rFeelings(); }
+  else if(lesson.type==="math"){ renderMath(); }
 }
 function coachHTML(text){
   return `<div class="coach"><span class="face">🦉</span><span class="bubble">${text}</span><button class="listen" id="listenBtn">🔊 Listen</button></div>`;
@@ -700,6 +740,151 @@ function setupRecord(text){
   playBtn.onclick=()=>{ if(recURL){ stopSpeak(); new Audio(recURL).play(); } };
 }
 function stopRec(){ try{ if(mediaRec&&mediaRec.state!=="inactive")mediaRec.stop(); }catch(e){} }
+
+/* ===================== MATH ===================== */
+function rand(n){ return Math.floor(Math.random()*n); }
+function genMath(op,max){
+  if(op==="sub"){ const a=2+rand(max-1); const b=1+rand(a-1); return {a,b,op:"sub",ans:a-b}; }
+  const a=1+rand(max-1); const b=1+rand(max-a); return {a,b,op:"add",ans:a+b};
+}
+function makeNumChoices(ans,top){
+  const set=new Set([ans]);
+  for(const c of shuffle([ans+1,ans-1,ans+2,ans-2,ans+3,ans-3])){ if(set.size>=3)break; if(c>=0&&c<=top+3&&c!==ans) set.add(c); }
+  while(set.size<3){ const r=rand(top+2); if(r!==ans) set.add(r); }
+  return shuffle([...set]);
+}
+function makeBlock(cls){ const b=elc("button","counter "+cls); return b; }
+function mathSeen(it){ markSeen((it.op==="add"?"➕ ":"➖ ")+it.a+(it.op==="add"?"+":"−")+it.b); }
+function answerNum(btn,chosen,it,container){
+  if(btn.dataset.locked)return;
+  if(chosen===it.ans){
+    btn.classList.add("correct"); container.querySelectorAll(".numBtn").forEach(b=>b.dataset.locked=1);
+    lesson.correct++; bumpStat(lesson.id,true); mathSeen(it);
+    const enc=$("enc"); if(enc)enc.textContent=cheer(); speak(cheer());
+    setTimeout(nextStep,950);
+  } else {
+    btn.classList.add("wrong"); btn.dataset.locked=1; bumpStat(lesson.id,false);
+    const enc=$("enc"); if(enc)enc.textContent="Try again — count carefully! 🌟";
+  }
+}
+
+function renderMath(){
+  const it=lesson.items[lesson.idx], k=lesson.kind;
+  if(k==="numberline") return rMathLine(it);
+  if(k==="quiz") return rMathQuiz(it);
+  return rMathSticks(it);
+}
+
+/* ---- Blocks / sticks: tap to count (add) or take away (sub) ---- */
+function rMathSticks(it){
+  const add=it.op==="add", body=$("actBody");
+  const coachTxt = add
+    ? `Let's add ${it.a} plus ${it.b}. Tap each block to count them all.`
+    : `You have ${it.a}. Take away ${it.b}. Tap ${it.b} blocks to take them away.`;
+  body.innerHTML = coachHTML(coachTxt)+
+    `<div class="card mathCard">
+      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="counters" id="counters"></div>
+      <div class="countTotal" id="ctot"></div>
+      <button class="btnMini" id="auto">${add?'👀 Count for me':'👀 Show me'}</button>
+      <div class="prompt" id="mprompt">${add?'How many altogether?':'How many are left?'}</div>
+      <div class="numChoices" id="opts"></div>
+      <div class="encourage" id="enc"></div>
+    </div>`;
+  const counters=$("counters");
+  if(add){
+    for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1"));
+    const plus=elc("div","plusSign"); plus.textContent="+"; counters.appendChild(plus);
+    for(let i=0;i<it.b;i++) counters.appendChild(makeBlock("g2"));
+  } else {
+    for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1"));
+  }
+  const blocks=[...counters.querySelectorAll(".counter")];
+  const tot=$("ctot"); let n=0;
+  tot.textContent = add ? "Counted: 0" : "Left: "+it.a;
+  blocks.forEach(b=>b.onclick=()=>{
+    if(add){ if(b.dataset.c)return; b.dataset.c=1; b.classList.add("counted"); n++; speak(String(n)); tot.textContent="Counted: "+n; }
+    else { if(b.dataset.g)return; if(n>=it.b)return; b.dataset.g=1; b.classList.add("gone"); n++; speak("take away"); tot.textContent="Left: "+(it.a-n); }
+  });
+  $("auto").onclick=()=>{
+    let i=0;
+    const step=()=>{
+      if(add){ if(i>=blocks.length)return; const b=blocks[i]; if(!b.dataset.c){b.dataset.c=1;b.classList.add("counted");} i++; speak(String(i)); tot.textContent="Counted: "+i; if(i<blocks.length)setTimeout(step,620); }
+      else { if(i>=it.b)return; const b=blocks[i]; b.dataset.g=1; b.classList.add("gone"); i++; speak("take away"); tot.textContent="Left: "+(it.a-i); if(i<it.b)setTimeout(step,620); }
+    };
+    step();
+  };
+  const opts=$("opts");
+  makeNumChoices(it.ans, add?(it.a+it.b):it.a).forEach(v=>{
+    const btn=elc("button","numBtn"); btn.textContent=v; btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn);
+  });
+  bindListen(()=>speak(coachTxt)); speak(coachTxt,{rate:.9});
+}
+
+/* ---- Number line: hop a frog forward (add) or back (sub) ---- */
+function paintLine(span,pos){
+  const nl=$("nl"); nl.innerHTML="";
+  for(let i=0;i<=span;i++){
+    const c=elc("div","nlcell"+(i===pos?" here":""));
+    c.innerHTML=`<div class="nlmark">${i===pos?"🐸":""}</div><div class="nltick"></div><div class="nlnum">${i}</div>`;
+    nl.appendChild(c);
+  }
+}
+function rMathLine(it){
+  const add=it.op==="add", body=$("actBody");
+  const span=Math.max(add?(it.a+it.b):it.a, 10);
+  let pos=it.a, hops=0;
+  const coachTxt = add ? `Start at ${it.a}. Hop forward ${it.b} times!` : `Start at ${it.a}. Hop back ${it.b} times!`;
+  body.innerHTML = coachHTML(coachTxt)+
+    `<div class="card">
+      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="numline" id="nl"></div>
+      <div class="prompt">Hops: <b id="hopn">0</b> / ${it.b}</div>
+      <button class="footerBtn ${add?'':'alt'}" id="hopBtn">${add?'➡️ Hop forward':'⬅️ Hop back'}</button>
+      <div class="encourage" id="enc"></div>
+    </div>`;
+  paintLine(span,pos);
+  $("hopBtn").onclick=()=>{
+    if(hops>=it.b) return;
+    hops++; pos += add?1:-1; speak(String(pos));
+    paintLine(span,pos); $("hopn").textContent=hops;
+    if(hops>=it.b){
+      $("hopBtn").disabled=true;
+      lesson.correct++; bumpStat(lesson.id,true); mathSeen(it);
+      const msg=`We landed on ${pos}! ${it.a} ${add?'plus':'minus'} ${it.b} is ${pos}.`;
+      $("enc").textContent=`🎉 ${it.a} ${add?'+':'–'} ${it.b} = ${pos}`;
+      speak(msg);
+      setTimeout(nextStep,1500);
+    }
+  };
+  bindListen(()=>speak(coachTxt)); speak(coachTxt,{rate:.9});
+}
+
+/* ---- Quick quiz: equation + small visual support + number choices ---- */
+function rMathQuiz(it){
+  const add=it.op==="add", body=$("actBody");
+  body.innerHTML = coachHTML("What is the answer?")+
+    `<div class="card">
+      <div class="mathEq big">${it.a} ${add?'+':'–'} ${it.b} = ?</div>
+      <div class="counters small" id="counters"></div>
+      <div class="numChoices" id="opts"></div>
+      <div class="encourage" id="enc"></div>
+    </div>`;
+  const counters=$("counters");
+  if(add){
+    for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1"));
+    const plus=elc("div","plusSign"); plus.textContent="+"; counters.appendChild(plus);
+    for(let i=0;i<it.b;i++) counters.appendChild(makeBlock("g2"));
+  } else {
+    for(let i=0;i<it.a;i++){ const b=makeBlock("g1"); if(i>=it.a-it.b)b.classList.add("gone"); counters.appendChild(b); }
+  }
+  const opts=$("opts");
+  makeNumChoices(it.ans, add?(it.a+it.b):it.a).forEach(v=>{
+    const btn=elc("button","numBtn"); btn.textContent=v; btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn);
+  });
+  bindListen(()=>speak(`${it.a} ${add?'plus':'minus'} ${it.b}. What is the answer?`));
+  speak(`${it.a} ${add?'plus':'minus'} ${it.b}`,{rate:.9});
+}
 
 /* ---- judge (shared for choice activities) ---- */
 function judge(btn,correct,container,sayOk,hintFn){
