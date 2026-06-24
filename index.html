@@ -256,6 +256,33 @@
   .nlnum{font-size:15px;font-weight:800;color:var(--muted);margin-top:2px;}
   .nlcell.here .nlnum{color:var(--blue);font-size:18px;}
   .nlcell.here .nltick{border-color:var(--blue);}
+
+  /* ===== Math v2: levels, base-ten, tally ===== */
+  .lvlChooser{display:flex;gap:10px;margin-bottom:14px;}
+  .lvlBtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:13px 8px;border-radius:15px;border:2px solid var(--line);
+    background:#fff;font-weight:900;font-size:16px;color:var(--ink);cursor:pointer;box-shadow:0 2px 8px var(--shadowS);}
+  .lvlBtn small{font-weight:700;font-size:11px;color:var(--muted);}
+  .lvlBtn.on{border-color:var(--blue);background:#eaf2fb;}
+  .lvlBtn.locked{opacity:.65;}
+  .hopBtns{display:flex;flex-direction:column;}
+
+  .counters.bt{gap:16px;align-items:flex-end;}
+  .btgroup{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:flex-end;justify-content:center;padding:6px 8px;border-radius:12px;background:rgba(0,0,0,.03);max-width:240px;}
+  .rod{width:16px;height:58px;border-radius:5px;border:none;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.14);}
+  .one{width:18px;height:18px;border-radius:5px;border:none;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.14);}
+  .rod.g1,.one.g1{background:linear-gradient(160deg,#5aa0e6,#3f7fe0);}
+  .rod.g2,.one.g2{background:linear-gradient(160deg,#6cc96c,#48b463);}
+  .rod.counted,.one.counted{outline:4px solid var(--sun);outline-offset:2px;}
+  .rod.gone,.one.gone{opacity:.28;transform:scale(.85) rotate(6deg);box-shadow:none;}
+
+  .tallies{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;align-items:center;margin:12px auto 8px;max-width:560px;}
+  .tgroup{position:relative;display:inline-flex;gap:5px;padding:2px 4px;}
+  .tmark{width:5px;height:38px;border-radius:3px;background:var(--blue);}
+  .tmark.g2{background:var(--green);}
+  .tslash{position:absolute;top:14px;left:-2px;width:calc(100% + 4px);height:5px;border-radius:3px;background:var(--blue);transform:rotate(-20deg);}
+  .tslash.g2{background:var(--green);}
+  .tmark.gone,.tslash.gone{background:#d9514e;opacity:.45;}
+  .tzero{font-size:24px;font-weight:900;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -329,7 +356,7 @@
 const SAVE_KEY="richitAllStar_v1";
 let state=loadState(), muted=false, currentTopic=null, lesson=null;
 function loadState(){ try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) return Object.assign(base(),s);}catch(e){} return base(); }
-function base(){ return {stars:0, runs:0, basePos:0, team:[], done:{}, log:{}, seen:{}, stats:{}, voice:null}; }
+function base(){ return {stars:0, runs:0, basePos:0, team:[], done:{}, log:{}, seen:{}, stats:{}, voice:null, mathLevel:{add:1,sub:1}, mlc:{}, mathUnlock:{}}; }
 function saveState(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(e){} }
 
 /* ===================== SPEECH ===================== */
@@ -472,12 +499,26 @@ const ACTIVITY_SETS={
         {k:"choose",big:"💬",t:"What Do I Say?",d:"Pick the phrase that fits"},
         {k:"say",big:"🎤",t:"Say It!",d:"Hear it, then record yourself"}],
   math:[{k:"sticks",big:"🟦",t:"Count with Blocks",d:"Tap to add or take away"},
+        {k:"tally",big:"🖐️",t:"Tally Marks",d:"Count by fives"},
         {k:"numberline",big:"📏",t:"Number Line",d:"Hop the frog to the answer"},
         {k:"quiz",big:"⚡",t:"Quick Quiz",d:"Pick the answer"}],
   read:[{k:"read",big:"📚",t:"Read & Answer",d:"Listen to a story, answer who & what"}],
   directions:[{k:"do",big:"👂",t:"Listen & Do",d:"Do what you hear"}],
   feelings:[{k:"feel",big:"😊",t:"Name the Feeling",d:"How do they feel? Then get calm"}],
 };
+function mathLevelChooser(id){
+  const cur=state.mathLevel[id]||1, unlocked=level2Unlocked(id), prog=Math.min(state.mlc[id+"|1"]||0, MATH_MASTER);
+  const wrap=elc("div","lvlChooser");
+  wrap.innerHTML=
+    `<button class="lvlBtn ${cur===1?'on':''}" data-l="1">Level 1<small>Single digit</small></button>
+     <button class="lvlBtn ${cur===2?'on':''} ${unlocked?'':'locked'}" data-l="2">${unlocked?'Level 2':'🔒 Level 2'}<small>${unlocked?'Double digit':prog+'/'+MATH_MASTER+' to unlock'}</small></button>`;
+  wrap.querySelector('[data-l="1"]').onclick=()=>{ state.mathLevel[id]=1; saveState(); openTopic(id); };
+  wrap.querySelector('[data-l="2"]').onclick=()=>{
+    if(level2Unlocked(id)){ state.mathLevel[id]=2; saveState(); openTopic(id); }
+    else { toast(`Master Level 1 first — ${prog}/${MATH_MASTER} correct`); }
+  };
+  return wrap;
+}
 function openTopic(id){
   currentTopic=id; const t=TOPICS.find(x=>x.id===id);
   const ms=$("menuScreen");
@@ -487,6 +528,7 @@ function openTopic(id){
     <div id="menuActs" style="margin-top:6px"></div>`;
   ms.querySelector("#menuBack").onclick=goHome;
   const m=ms.querySelector("#menuActs");
+  if(t.type==="math") m.appendChild(mathLevelChooser(id));
   (ACTIVITY_SETS[t.type]||[]).forEach(a=>{
     const b=elc("button","actBtn"); b.onclick=()=>startActivity(id,a.k);
     const tick=state.done[id+"_"+a.k]?" ✓":"";
@@ -499,10 +541,11 @@ function openTopic(id){
 /* ===================== ACTIVITY ENGINE ===================== */
 function startActivity(id,kind){
   const t=TOPICS.find(x=>x.id===id);
+  const lvl = t.type==="math" ? (state.mathLevel[id]||1) : 1;
   const items = t.type==="math"
-    ? Array.from({length:t.count||6},()=>genMath(t.op,t.max||10))
+    ? Array.from({length:t.count||10},()=>genMath(t.op,lvl))
     : shuffle(t.items);
-  lesson={id,kind,type:t.type,items,idx:0,correct:0,topic:t};
+  lesson={id,kind,type:t.type,items,idx:0,correct:0,topic:t,level:lvl};
   const s=state.stats[id]||(state.stats[id]={a:0,c:0,sess:0}); s.sess++; saveState();
   renderDots(); renderStep(); show("actScreen");
 }
@@ -742,24 +785,62 @@ function setupRecord(text){
 function stopRec(){ try{ if(mediaRec&&mediaRec.state!=="inactive")mediaRec.stop(); }catch(e){} }
 
 /* ===================== MATH ===================== */
+const MATH_MASTER=20; // correct answers at Level 1 needed to unlock Level 2
 function rand(n){ return Math.floor(Math.random()*n); }
-function genMath(op,max){
-  if(op==="sub"){ const a=2+rand(max-1); const b=1+rand(a-1); return {a,b,op:"sub",ans:a-b}; }
-  const a=1+rand(max-1); const b=1+rand(max-a); return {a,b,op:"add",ans:a+b};
+function genMath(op,level){
+  if(level===2){
+    if(op==="sub"){
+      // two-digit minus, NO borrowing (per IEP)
+      const Ta=1+rand(3), Oa=rand(10);           // a = 10..39
+      const Tb=rand(Ta+1), Ob=rand(Oa+1);        // each digit of b <= a's digit
+      const a=Ta*10+Oa, b=Tb*10+Ob;
+      if(b<1||b>=a) return genMath(op,level);
+      return {a,b,op:"sub",ans:a-b,level:2};
+    }
+    const a=10+rand(20), b=5+rand(16);           // two-digit + up to 20
+    if(a+b>40) return genMath(op,level);
+    return {a,b,op:"add",ans:a+b,level:2};
+  }
+  // Level 1 — single digit
+  if(op==="sub"){ const a=2+rand(9); const b=1+rand(a-1); return {a,b,op:"sub",ans:a-b,level:1}; } // a 2..10
+  const a=1+rand(9), b=1+rand(9); return {a,b,op:"add",ans:a+b,level:1};                            // a,b 1..9
 }
-function makeNumChoices(ans,top){
+function level2Unlocked(id){ return (state.mlc[id+"|1"]||0)>=MATH_MASTER || !!(state.mathUnlock&&state.mathUnlock[id]); }
+function makeNumChoices(it){
+  const ans=it.ans, lvl=it.level||1;
+  const cands = lvl===2 ? [ans+1,ans-1,ans+2,ans-2,ans+10,ans-10,ans+11] : [ans+1,ans-1,ans+2,ans-2,ans+3];
   const set=new Set([ans]);
-  for(const c of shuffle([ans+1,ans-1,ans+2,ans-2,ans+3,ans-3])){ if(set.size>=3)break; if(c>=0&&c<=top+3&&c!==ans) set.add(c); }
-  while(set.size<3){ const r=rand(top+2); if(r!==ans) set.add(r); }
+  for(const c of shuffle(cands)){ if(set.size>=3)break; if(c>=0&&c!==ans) set.add(c); }
+  while(set.size<3){ const r=ans+(rand(11)-5); if(r>=0&&r!==ans) set.add(r); }
   return shuffle([...set]);
 }
-function makeBlock(cls){ const b=elc("button","counter "+cls); return b; }
+function makeBlock(cls){ return elc("button","counter "+cls); }
+function baseTenGroup(n,cls){
+  const wrap=elc("div","btgroup");
+  for(let i=0;i<Math.floor(n/10);i++) wrap.appendChild(elc("button","rod "+cls));
+  for(let i=0;i<n%10;i++) wrap.appendChild(elc("button","one "+cls));
+  return wrap;
+}
+function tallyMarksHTML(n,cls,crossFrom){
+  let html="", idx=0, rem=n;
+  while(rem>0){
+    const g=Math.min(5,rem); html+='<span class="tgroup">';
+    for(let i=0;i<Math.min(g,4);i++){ html+=`<span class="tmark ${cls}${(crossFrom!=null&&idx>=crossFrom)?' gone':''}"></span>`; idx++; }
+    if(g===5){ html+=`<span class="tslash ${cls}${(crossFrom!=null&&idx>=crossFrom)?' gone':''}"></span>`; idx++; }
+    html+='</span>'; rem-=g;
+  }
+  return html||'<span class="tzero">0</span>';
+}
 function mathSeen(it){ markSeen((it.op==="add"?"➕ ":"➖ ")+it.a+(it.op==="add"?"+":"−")+it.b); }
+function onMathCorrect(it){
+  lesson.correct++; bumpStat(lesson.id,true); mathSeen(it);
+  const key=lesson.id+"|"+(it.level||1); state.mlc[key]=(state.mlc[key]||0)+1; saveState();
+}
 function answerNum(btn,chosen,it,container){
   if(btn.dataset.locked)return;
   if(chosen===it.ans){
     btn.classList.add("correct"); container.querySelectorAll(".numBtn").forEach(b=>b.dataset.locked=1);
-    lesson.correct++; bumpStat(lesson.id,true); mathSeen(it);
+    onMathCorrect(it);
     const enc=$("enc"); if(enc)enc.textContent=cheer(); speak(cheer());
     setTimeout(nextStep,950);
   } else {
@@ -767,15 +848,20 @@ function answerNum(btn,chosen,it,container){
     const enc=$("enc"); if(enc)enc.textContent="Try again — count carefully! 🌟";
   }
 }
+function mathChoices(it){
+  const opts=$("opts");
+  makeNumChoices(it).forEach(v=>{ const btn=elc("button","numBtn"); btn.textContent=v; btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn); });
+}
 
 function renderMath(){
   const it=lesson.items[lesson.idx], k=lesson.kind;
   if(k==="numberline") return rMathLine(it);
   if(k==="quiz") return rMathQuiz(it);
-  return rMathSticks(it);
+  if(k==="tally") return rMathTally(it);
+  return (it.level===2) ? rMathBaseTen(it) : rMathSticks(it);
 }
 
-/* ---- Blocks / sticks: tap to count (add) or take away (sub) ---- */
+/* ---- Blocks (Level 1): tap to count (add) or take away (sub) ---- */
 function rMathSticks(it){
   const add=it.op==="add", body=$("actBody");
   const coachTxt = add
@@ -787,7 +873,7 @@ function rMathSticks(it){
       <div class="counters" id="counters"></div>
       <div class="countTotal" id="ctot"></div>
       <button class="btnMini" id="auto">${add?'👀 Count for me':'👀 Show me'}</button>
-      <div class="prompt" id="mprompt">${add?'How many altogether?':'How many are left?'}</div>
+      <div class="prompt">${add?'How many altogether?':'How many are left?'}</div>
       <div class="numChoices" id="opts"></div>
       <div class="encourage" id="enc"></div>
     </div>`;
@@ -796,9 +882,7 @@ function rMathSticks(it){
     for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1"));
     const plus=elc("div","plusSign"); plus.textContent="+"; counters.appendChild(plus);
     for(let i=0;i<it.b;i++) counters.appendChild(makeBlock("g2"));
-  } else {
-    for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1"));
-  }
+  } else { for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1")); }
   const blocks=[...counters.querySelectorAll(".counter")];
   const tot=$("ctot"); let n=0;
   tot.textContent = add ? "Counted: 0" : "Left: "+it.a;
@@ -806,22 +890,81 @@ function rMathSticks(it){
     if(add){ if(b.dataset.c)return; b.dataset.c=1; b.classList.add("counted"); n++; speak(String(n)); tot.textContent="Counted: "+n; }
     else { if(b.dataset.g)return; if(n>=it.b)return; b.dataset.g=1; b.classList.add("gone"); n++; speak("take away"); tot.textContent="Left: "+(it.a-n); }
   });
-  $("auto").onclick=()=>{
-    let i=0;
-    const step=()=>{
-      if(add){ if(i>=blocks.length)return; const b=blocks[i]; if(!b.dataset.c){b.dataset.c=1;b.classList.add("counted");} i++; speak(String(i)); tot.textContent="Counted: "+i; if(i<blocks.length)setTimeout(step,620); }
-      else { if(i>=it.b)return; const b=blocks[i]; b.dataset.g=1; b.classList.add("gone"); i++; speak("take away"); tot.textContent="Left: "+(it.a-i); if(i<it.b)setTimeout(step,620); }
-    };
-    step();
-  };
-  const opts=$("opts");
-  makeNumChoices(it.ans, add?(it.a+it.b):it.a).forEach(v=>{
-    const btn=elc("button","numBtn"); btn.textContent=v; btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn);
-  });
+  $("auto").onclick=()=>{ let i=0; const step=()=>{
+    if(add){ if(i>=blocks.length)return; const b=blocks[i]; if(!b.dataset.c){b.dataset.c=1;b.classList.add("counted");} i++; speak(String(i)); tot.textContent="Counted: "+i; if(i<blocks.length)setTimeout(step,560); }
+    else { if(i>=it.b)return; const b=blocks[i]; b.dataset.g=1; b.classList.add("gone"); i++; speak("take away"); tot.textContent="Left: "+(it.a-i); if(i<it.b)setTimeout(step,560); }
+  }; step(); };
+  mathChoices(it);
   bindListen(()=>speak(coachTxt)); speak(coachTxt,{rate:.9});
 }
 
-/* ---- Number line: hop a frog forward (add) or back (sub) ---- */
+/* ---- Base-ten blocks (Level 2): tens-rods + ones ---- */
+function rMathBaseTen(it){
+  const add=it.op==="add", body=$("actBody");
+  const bt=Math.floor(it.b/10), bo=it.b%10;
+  const coachTxt = add
+    ? `Let's add ${it.a} plus ${it.b}. Tap the tall tens and the small ones to count.`
+    : `You have ${it.a}. Take away ${it.b}. Cross out ${bt} ten${bt===1?'':'s'} and ${bo} one${bo===1?'':'s'}.`;
+  body.innerHTML = coachHTML(coachTxt)+
+    `<div class="card mathCard">
+      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="counters bt" id="counters"></div>
+      <div class="countTotal" id="ctot"></div>
+      <button class="btnMini" id="auto">${add?'👀 Count for me':'👀 Show me'}</button>
+      <div class="prompt">${add?'How many altogether?':'How many are left?'}</div>
+      <div class="numChoices" id="opts"></div>
+      <div class="encourage" id="enc"></div>
+    </div>`;
+  const counters=$("counters");
+  counters.appendChild(baseTenGroup(it.a,"g1"));
+  if(add){ const plus=elc("div","plusSign"); plus.textContent="+"; counters.appendChild(plus); counters.appendChild(baseTenGroup(it.b,"g2")); }
+  const rods=[...counters.querySelectorAll(".rod")], ones=[...counters.querySelectorAll(".one")];
+  const tot=$("ctot");
+  if(add){
+    let n=0; tot.textContent="Counted: 0";
+    const tap=(el,val)=>{ if(el.dataset.c)return; el.dataset.c=1; el.classList.add("counted"); n+=val; speak(String(n)); tot.textContent="Counted: "+n; };
+    rods.forEach(r=>r.onclick=()=>tap(r,10)); ones.forEach(o=>o.onclick=()=>tap(o,1));
+    $("auto").onclick=()=>{ const q=[...rods,...ones]; let i=0,n2=0; const step=()=>{ if(i>=q.length)return; const el=q[i],val=el.classList.contains("rod")?10:1; if(!el.dataset.c){el.dataset.c=1;el.classList.add("counted");} n2+=val; i++; speak(String(n2)); tot.textContent="Counted: "+n2; if(i<q.length)setTimeout(step,520); }; step(); };
+  } else {
+    let rt=0, ro=0; tot.textContent="Left: "+it.a;
+    const upd=()=>{ tot.textContent="Left: "+(it.a-(rt*10+ro)); };
+    rods.forEach(r=>r.onclick=()=>{ if(r.dataset.g||rt>=bt)return; r.dataset.g=1; r.classList.add("gone"); rt++; speak("take away ten"); upd(); });
+    ones.forEach(o=>o.onclick=()=>{ if(o.dataset.g||ro>=bo)return; o.dataset.g=1; o.classList.add("gone"); ro++; speak("take away"); upd(); });
+    $("auto").onclick=()=>{ const q=[...rods.slice(0,bt),...ones.slice(0,bo)]; let i=0; const step=()=>{ if(i>=q.length)return; const el=q[i]; if(!el.dataset.g){el.dataset.g=1;el.classList.add("gone"); if(el.classList.contains("rod"))rt=Math.min(bt,rt+1); else ro=Math.min(bo,ro+1);} i++; upd(); speak("take away"); if(i<q.length)setTimeout(step,520); }; step(); };
+  }
+  mathChoices(it);
+  bindListen(()=>speak(coachTxt)); speak(coachTxt,{rate:.9});
+}
+
+/* ---- Tally marks: four bars + a slash across for five ---- */
+function rMathTally(it){
+  const add=it.op==="add", body=$("actBody");
+  const coachTxt = add
+    ? `Count the tally marks by fives. ${it.a}, and ${it.b} more!`
+    : `Start with ${it.a}. The crossed marks are taken away. Count what's left by fives.`;
+  body.innerHTML = coachHTML(coachTxt)+
+    `<div class="card">
+      <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
+      <div class="tallies" id="tw"></div>
+      <div class="countTotal" id="ctot">Count: 0</div>
+      <button class="btnMini" id="auto">👀 Count by 5s</button>
+      <div class="prompt">${add?'How many altogether?':'How many are left?'}</div>
+      <div class="numChoices" id="opts"></div>
+      <div class="encourage" id="enc"></div>
+    </div>`;
+  const tw=$("tw");
+  if(add){ tw.innerHTML = tallyMarksHTML(it.a,"g1") + '<span class="plusSign">+</span>' + tallyMarksHTML(it.b,"g2"); }
+  else { tw.innerHTML = tallyMarksHTML(it.a,"g1", it.a-it.b); }   // cross out the last b marks
+  const total=it.ans, tot=$("ctot");
+  $("auto").onclick=()=>{
+    const seq=[]; const f=Math.floor(total/5); for(let i=1;i<=f;i++) seq.push(i*5); if(total%5||total===0) seq.push(total);
+    let i=0; const step=()=>{ if(i>=seq.length)return; tot.textContent="Count: "+seq[i]; speak(String(seq[i])); i++; if(i<seq.length)setTimeout(step,600); }; step();
+  };
+  mathChoices(it);
+  bindListen(()=>speak(coachTxt)); speak(coachTxt,{rate:.9});
+}
+
+/* ---- Number line: hop a frog (Level 2 hops by tens and ones) ---- */
 function paintLine(span,pos){
   const nl=$("nl"); nl.innerHTML="";
   for(let i=0;i<=span;i++){
@@ -831,32 +974,42 @@ function paintLine(span,pos){
   }
 }
 function rMathLine(it){
-  const add=it.op==="add", body=$("actBody");
+  const add=it.op==="add", body=$("actBody"), lvl2=it.level===2;
   const span=Math.max(add?(it.a+it.b):it.a, 10);
-  let pos=it.a, hops=0;
-  const coachTxt = add ? `Start at ${it.a}. Hop forward ${it.b} times!` : `Start at ${it.a}. Hop back ${it.b} times!`;
+  let pos=it.a, remain=it.b;
+  const coachTxt = add
+    ? `Start at ${it.a}. Hop forward ${it.b}${lvl2?' — use tens and ones!':' times!'}`
+    : `Start at ${it.a}. Hop back ${it.b}${lvl2?' — use tens and ones!':' times!'}`;
   body.innerHTML = coachHTML(coachTxt)+
     `<div class="card">
       <div class="mathEq">${it.a} ${add?'+':'–'} ${it.b} = <span class="qm">?</span></div>
       <div class="numline" id="nl"></div>
-      <div class="prompt">Hops: <b id="hopn">0</b> / ${it.b}</div>
-      <button class="footerBtn ${add?'':'alt'}" id="hopBtn">${add?'➡️ Hop forward':'⬅️ Hop back'}</button>
+      <div class="prompt">Left to hop: <b id="hopn">${it.b}</b></div>
+      <div class="hopBtns" id="hopBtns"></div>
       <div class="encourage" id="enc"></div>
     </div>`;
   paintLine(span,pos);
-  $("hopBtn").onclick=()=>{
-    if(hops>=it.b) return;
-    hops++; pos += add?1:-1; speak(String(pos));
-    paintLine(span,pos); $("hopn").textContent=hops;
-    if(hops>=it.b){
-      $("hopBtn").disabled=true;
-      lesson.correct++; bumpStat(lesson.id,true); mathSeen(it);
-      const msg=`We landed on ${pos}! ${it.a} ${add?'plus':'minus'} ${it.b} is ${pos}.`;
+  const hb=$("hopBtns");
+  function hop(step){
+    if(remain<step) return;
+    remain-=step; pos += add?step:-step; speak(String(pos));
+    paintLine(span,pos); $("hopn").textContent=remain;
+    if(remain<=0){
+      hb.querySelectorAll("button").forEach(b=>b.disabled=true);
+      onMathCorrect(it);
       $("enc").textContent=`🎉 ${it.a} ${add?'+':'–'} ${it.b} = ${pos}`;
-      speak(msg);
+      speak(`We landed on ${pos}! ${it.a} ${add?'plus':'minus'} ${it.b} is ${pos}.`);
       setTimeout(nextStep,1500);
     }
-  };
+  }
+  if(lvl2){
+    const b10=elc("button","footerBtn"+(add?"":" alt")); b10.textContent=add?'➡️ Hop 10':'⬅️ Hop 10'; b10.onclick=()=>hop(10);
+    const b1=elc("button","footerBtn"+(add?"":" alt")); b1.style.marginTop="8px"; b1.textContent=add?'➡️ Hop 1':'⬅️ Hop 1'; b1.onclick=()=>hop(1);
+    hb.appendChild(b10); hb.appendChild(b1);
+  } else {
+    const b1=elc("button","footerBtn"+(add?"":" alt")); b1.textContent=add?'➡️ Hop forward':'⬅️ Hop back'; b1.onclick=()=>hop(1);
+    hb.appendChild(b1);
+  }
   bindListen(()=>speak(coachTxt)); speak(coachTxt,{rate:.9});
 }
 
@@ -871,17 +1024,17 @@ function rMathQuiz(it){
       <div class="encourage" id="enc"></div>
     </div>`;
   const counters=$("counters");
-  if(add){
+  if(it.level===2){
+    counters.appendChild(baseTenGroup(it.a,"g1"));
+    if(add){ const p=elc("div","plusSign"); p.textContent="+"; counters.appendChild(p); counters.appendChild(baseTenGroup(it.b,"g2")); }
+  } else if(add){
     for(let i=0;i<it.a;i++) counters.appendChild(makeBlock("g1"));
     const plus=elc("div","plusSign"); plus.textContent="+"; counters.appendChild(plus);
     for(let i=0;i<it.b;i++) counters.appendChild(makeBlock("g2"));
   } else {
     for(let i=0;i<it.a;i++){ const b=makeBlock("g1"); if(i>=it.a-it.b)b.classList.add("gone"); counters.appendChild(b); }
   }
-  const opts=$("opts");
-  makeNumChoices(it.ans, add?(it.a+it.b):it.a).forEach(v=>{
-    const btn=elc("button","numBtn"); btn.textContent=v; btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn);
-  });
+  mathChoices(it);
   bindListen(()=>speak(`${it.a} ${add?'plus':'minus'} ${it.b}. What is the answer?`));
   speak(`${it.a} ${add?'plus':'minus'} ${it.b}`,{rate:.9});
 }
@@ -1013,9 +1166,18 @@ function openParent(){
     <div class="pcard"><div style="font-weight:900;font-size:16px">Coaching at home 🏡</div>
       <div class="note">Difficulty never ramps up on its own — Richit replays the same level as long as he likes. If he misses twice, the app gently highlights the answer. Praise effort, not just correct answers. Use today's Word of the Day in a real sentence at dinner. For "My Words," have him <b>say the phrase out loud</b> after the app models it — that's his gestalt-language goal in action.</div></div>
 
+    <div class="pcard"><div style="font-weight:900;font-size:16px">Math levels 🔢</div>
+      <div class="note">Level 2 (double digit) unlocks after <b>${MATH_MASTER}</b> correct answers at Level 1. Addition: ${Math.min(state.mlc['add|1']||0,MATH_MASTER)}/${MATH_MASTER} · Subtraction: ${Math.min(state.mlc['sub|1']||0,MATH_MASTER)}/${MATH_MASTER}. You can unlock early here.</div>
+      <div class="vrow">
+        <button class="vbtn ${level2Unlocked('add')?'on':''}" id="ulAdd">${level2Unlocked('add')?'Addition L2 ✓':'Unlock Addition L2'}</button>
+        <button class="vbtn ${level2Unlocked('sub')?'on':''}" id="ulSub">${level2Unlocked('sub')?'Subtraction L2 ✓':'Unlock Subtraction L2'}</button>
+      </div></div>
+
     <button class="footerBtn" id="resetBtn" style="background:#e0697a;box-shadow:0 6px 0 #b34d5d">Reset all progress</button>`;
 
-  $("parentBody").querySelectorAll("#vrow .vbtn").forEach(b=>b.onclick=()=>{ state.voice=b.dataset.v; saveState(); pickVoice(); speak("Hi Richit! This is my voice."); openParent(); });
+  $("ulAdd").onclick=()=>{ state.mathUnlock.add=true; saveState(); openParent(); };
+  $("ulSub").onclick=()=>{ state.mathUnlock.sub=true; saveState(); openParent(); };
+  $("parentBody").querySelectorAll("#vrow .vbtn").forEach(b=>{ if(b.dataset.v) b.onclick=()=>{ state.voice=b.dataset.v; saveState(); pickVoice(); speak("Hi Richit! This is my voice."); openParent(); }; });
   $("resetBtn").onclick=()=>{ if(confirm("Reset all of Richit's progress?")){ localStorage.removeItem(SAVE_KEY); state=loadState(); openParent(); } };
   show("parentScreen");
 }

@@ -351,7 +351,7 @@ const TEAM = ["🧢","⚾","🥎","🏆","🥇","🦅","🐯","🦁","🚀","�
    max = largest sum / starting number. Aligned to IEP: add & take
    away with manipulatives, counting on, number line. */
 const MATH = [
-  { id:"add", name:"Addition", emoji:"➕", type:"math", op:"add", color:"green", max:10, count:6 },
-  { id:"sub", name:"Subtraction", emoji:"➖", type:"math", op:"sub", color:"pink",  max:10, count:6 },
+  { id:"add", name:"Addition", emoji:"➕", type:"math", op:"add", color:"green", count:10 },
+  { id:"sub", name:"Subtraction", emoji:"➖", type:"math", op:"sub", color:"pink",  count:10 },
 ];
 TOPICS.push(...MATH);
