@@ -372,3 +372,47 @@ const AAC_CORE = [
 const AAC_REPAIR = [
   {t:"I don't know",ic:"🤷"},{t:"Say it again",ic:"🔁"},{t:"Show me",ic:"👀"},{t:"Help me",ic:"🤝"},
 ];
+
+/* ===================== PHASE 3: NUMBER SENSE ===================== */
+const NS_OBJECTS = ["🍎","⚾","🐠","⭐","🚗","🐱","🍪","🎈","🌸","🦋","🐝","🍌"];
+
+/* Word problems with 5-step comprehension gates */
+const WORDPROBS = [
+  {text:"Sam has 3 apples. Mia gives him 2 more apples. How many apples altogether?", scene:"🍎", op:"add", a:3, b:2},
+  {text:"There are 5 birds in a tree. 2 birds fly away. How many birds are left?", scene:"🐦", op:"sub", a:5, b:2},
+  {text:"Ben has 4 toy cars. He gets 3 more for his birthday. How many cars in all?", scene:"🚗", op:"add", a:4, b:3},
+  {text:"Lily has 6 cookies. She eats 2 cookies. How many cookies are left?", scene:"🍪", op:"sub", a:6, b:2},
+  {text:"2 ducks are in the pond. 4 more ducks come. How many ducks altogether?", scene:"🦆", op:"add", a:2, b:4},
+  {text:"There are 7 balloons. 3 balloons pop. How many balloons are left?", scene:"🎈", op:"sub", a:7, b:3},
+  {text:"Mom bakes 3 muffins. Then she bakes 5 more. How many muffins in all?", scene:"🧁", op:"add", a:3, b:5},
+  {text:"8 fish are in the tank. 5 fish hide. How many fish can we see?", scene:"🐠", op:"sub", a:8, b:5},
+  {text:"Anna picks 4 flowers. Then she picks 4 more. How many flowers altogether?", scene:"🌸", op:"add", a:4, b:4},
+  {text:"There are 9 stars. 6 stars fade away. How many stars are left?", scene:"⭐", op:"sub", a:9, b:6},
+].map(p=>({ ...p, ans: p.op==="add" ? p.a+p.b : p.a-p.b }));
+
+/* ===================== PHASE 4: PHONOLOGICAL AWARENESS ===================== */
+const RHYMES = [
+  {word:"cat", ic:"🐱", rhyme:{word:"hat",ic:"🎩"}, distractors:[{word:"dog",ic:"🐶"},{word:"sun",ic:"☀️"}]},
+  {word:"dog", ic:"🐶", rhyme:{word:"log",ic:"🪵"}, distractors:[{word:"cat",ic:"🐱"},{word:"pig",ic:"🐷"}]},
+  {word:"star",ic:"⭐", rhyme:{word:"car",ic:"🚗"}, distractors:[{word:"moon",ic:"🌙"},{word:"fish",ic:"🐠"}]},
+  {word:"bee", ic:"🐝", rhyme:{word:"tree",ic:"🌳"}, distractors:[{word:"ball",ic:"⚾"},{word:"hat",ic:"🎩"}]},
+  {word:"cake",ic:"🎂", rhyme:{word:"snake",ic:"🐍"}, distractors:[{word:"milk",ic:"🥛"},{word:"frog",ic:"🐸"}]},
+  {word:"sun", ic:"☀️", rhyme:{word:"bun",ic:"🍔"}, distractors:[{word:"car",ic:"🚗"},{word:"bed",ic:"🛏️"}]},
+  {word:"frog",ic:"🐸", rhyme:{word:"log",ic:"🪵"}, distractors:[{word:"duck",ic:"🦆"},{word:"star",ic:"⭐"}]},
+  {word:"bat", ic:"🦇", rhyme:{word:"hat",ic:"🎩"}, distractors:[{word:"sun",ic:"☀️"},{word:"dog",ic:"🐶"}]},
+];
+const SYLLABLES = [
+  {word:"cat",ic:"🐱",n:1},{word:"apple",ic:"🍎",n:2},{word:"banana",ic:"🍌",n:3},
+  {word:"dog",ic:"🐶",n:1},{word:"tiger",ic:"🐯",n:2},{word:"elephant",ic:"🐘",n:3},
+  {word:"sun",ic:"☀️",n:1},{word:"rabbit",ic:"🐰",n:2},{word:"butterfly",ic:"🦋",n:3},
+  {word:"star",ic:"⭐",n:1},{word:"pizza",ic:"🍕",n:2},{word:"dinosaur",ic:"🦕",n:3},
+];
+
+TOPICS.push(
+  {id:"ns_count",   name:"Count Objects",    emoji:"🔢", type:"ns", mode:"count",   color:"blue",   count:8},
+  {id:"ns_numeral", name:"Match the Number", emoji:"#️⃣", type:"ns", mode:"numeral", color:"teal",   count:8},
+  {id:"ns_compare", name:"More or Less",     emoji:"⚖️", type:"ns", mode:"compare", color:"purple", count:8},
+  {id:"wordprob",   name:"Word Problems",    emoji:"🧩", type:"wordproblem", color:"green", items:WORDPROBS},
+  {id:"rhyme",      name:"Rhyming",          emoji:"🎵", type:"rhyme",    color:"pink", items:RHYMES},
+  {id:"syllables",  name:"Syllables",        emoji:"👏", type:"syllable", color:"sun",  items:SYLLABLES}
+);

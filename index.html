@@ -363,6 +363,18 @@
   body.big-text .prompt{font-size:18px;}
   body.big-text .aacBtn,body.big-text .tab,body.big-text .actBtn .t{font-size:17px;}
   body.big-text .sub{font-size:16px;}
+
+  /* ===== Phase 3/4 activities ===== */
+  .nsObjs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:10px auto;max-width:520px;}
+  .nsObj{font-size:34px;background:#fff;border:2px solid var(--line);border-radius:12px;width:56px;height:56px;cursor:pointer;line-height:1;}
+  .nsObj.counted{outline:4px solid var(--sun);outline-offset:2px;background:#fff8ec;}
+  .nsCompare{display:flex;gap:14px;margin:6px 0;}
+  .nsSide{flex:1;border:2px solid var(--line);border-radius:12px;padding:12px;min-height:96px;display:flex;align-items:center;justify-content:center;}
+  .nsGroup{font-size:28px;line-height:1.35;word-break:break-word;text-align:center;}
+  .gateBar{display:flex;gap:6px;justify-content:center;margin:0 0 12px;}
+  .gateBar span{width:38px;height:7px;border-radius:6px;background:var(--line);}
+  .gateBar span.done{background:var(--good);}
+  .gateBar span.now{background:var(--blue);}
 </style>
 </head>
 <body>
@@ -546,8 +558,8 @@ function topicProgress(t){
   return Math.round(done/target*100);
 }
 const SECTIONS=[
-  {key:"reading", label:"📖 Reading", ids:["letters","cvc_a","cvc_e","cvc_i","cvc_o","cvc_u","digraphs","blends","sight1","sight2","stories"]},
-  {key:"math", label:"🔢 Math", ids:["add","sub","wordclue"]},
+  {key:"reading", label:"📖 Reading", ids:["letters","rhyme","syllables","cvc_a","cvc_e","cvc_i","cvc_o","cvc_u","digraphs","blends","sight1","sight2","stories"]},
+  {key:"math", label:"🔢 Math", ids:["ns_count","ns_numeral","ns_compare","add","sub","wordclue","wordprob"]},
   {key:"talking", label:"💬 Talking", ids:["comm_want","comm_comment","comm_problem","comm_social","directions"]},
   {key:"feelings", label:"😊 Feelings", ids:["feelings"]},
   {key:"convos", label:"🎭 Conversations", scripts:true},
@@ -612,6 +624,10 @@ const ACTIVITY_SETS={
   directions:[{k:"do",big:"👂",t:"Listen & Do",d:"Do what you hear"}],
   feelings:[{k:"feel",big:"😊",t:"Name the Feeling",d:"How do they feel? Then get calm"}],
   wordclue:[{k:"sort",big:"🔤",t:"Add or Take Away?",d:"Which word tells us?"}],
+  ns:[{k:"play",big:"🔢",t:"Let's Count",d:"Count and choose the number"}],
+  wordproblem:[{k:"solve",big:"🧩",t:"Word Problem",d:"Read · decide · show · solve"}],
+  rhyme:[{k:"play",big:"🎵",t:"Find the Rhyme",d:"Which word sounds the same?"}],
+  syllable:[{k:"play",big:"👏",t:"Clap the Beats",d:"How many syllables?"}],
 };
 function mathLevelChooser(id){
   const cur=state.mathLevel[id]||1, unlocked=level2Unlocked(id), prog=Math.min(state.mlc[id+"|1"]||0, MATH_MASTER);
@@ -651,6 +667,8 @@ function startActivity(id,kind,len){
   const lvl = t.type==="math" ? (state.mathLevel[id]||1) : 1;
   let items = t.type==="math"
     ? Array.from({length:t.count||10},()=>genMath(t.op,lvl))
+    : t.type==="ns"
+    ? Array.from({length:t.count||8},()=>genNS(t.mode))
     : shuffle(t.items);
   if(len) items = items.slice(0,len);
   lesson={id,kind,type:t.type,items,idx:0,correct:0,topic:t,level:lvl};
@@ -696,6 +714,10 @@ function renderStep(){
   else if(lesson.type==="feelings"){ rFeelings(); }
   else if(lesson.type==="math"){ renderMath(); }
   else if(lesson.type==="wordclue"){ rWordClue(lesson.items[lesson.idx]); }
+  else if(lesson.type==="ns"){ rNumberSense(lesson.items[lesson.idx]); }
+  else if(lesson.type==="wordproblem"){ rWordProblem(lesson.items[lesson.idx], 0); }
+  else if(lesson.type==="rhyme"){ rRhyme(lesson.items[lesson.idx]); }
+  else if(lesson.type==="syllable"){ rSyllable(lesson.items[lesson.idx]); }
 }
 function coachHTML(text){
   return `<div class="coach"><span class="face">🦉</span><span class="bubble">${text}</span><button class="listen" id="listenBtn">🔊 Listen</button></div>`;
@@ -1059,6 +1081,137 @@ function rWordClue(it){
   bindListen(()=>speak(`The word is ${it.word}. Does it mean put together, or take away?`));
   speak(`The word is ${it.word}.`,{rate:.9});
 }
+/* ===================== PHASE 3: NUMBER SENSE ===================== */
+function genNS(mode){
+  const obj=NS_OBJECTS[rand(NS_OBJECTS.length)];
+  if(mode==="numeral"){ return {mode,n:1+rand(9),ic:obj}; }
+  if(mode==="compare"){ const equal=rand(3)===0; let a=2+rand(7), b=2+rand(7); if(equal)b=a; else while(b===a)b=2+rand(7);
+    const ask=equal?"equal":(rand(2)?"more":"less"); return {mode:"compare",a,b,ask,icA:obj,icB:NS_OBJECTS[rand(NS_OBJECTS.length)]}; }
+  return {mode:"count", n:2+rand(8), ic:obj};
+}
+function nsChoices(correct,max){ const set=new Set([correct]); let g=0; while(set.size<3&&g++<40){ const c=correct+(rand(5)-2); if(c>=1&&c<=(max||10)&&c!==correct)set.add(c); } return shuffle([...set]); }
+function nsJudge(btn, ok, container){
+  if(btn.dataset.locked)return;
+  if(ok){ btn.classList.add("correct"); [...container.children].forEach(c=>c.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); const enc=$("enc"); if(enc)enc.textContent=cheer(); speak(cheer()); setTimeout(nextStep,850); }
+  else { btn.classList.add("wrong"); btn.dataset.locked=1; bumpStat(lesson.id,false); const enc=$("enc"); if(enc)enc.textContent="Let's look again 🌟"; }
+}
+function rNumberSense(it){
+  const body=$("actBody");
+  if(it.mode==="count"){
+    const coach="Count the objects. Tap each one, then choose how many.";
+    body.innerHTML=coachHTML(coach)+
+      `<div class="card"><div class="prompt">Tap each one to count 👆</div>
+        <div class="nsObjs" id="nsObjs"></div><div class="countTotal" id="ctot">Counted: 0</div>
+        <button class="btnMini" id="auto">👀 Count for me</button>
+        <div class="prompt">How many?</div><div class="numChoices" id="opts"></div><div class="encourage" id="enc"></div></div>`;
+    const wrap=$("nsObjs"); for(let i=0;i<it.n;i++){ const b=elc("button","nsObj"); b.textContent=it.ic; b.setAttribute("aria-label","object"); wrap.appendChild(b); }
+    const objs=[...wrap.querySelectorAll(".nsObj")]; let n=0; const tot=$("ctot");
+    objs.forEach(b=>b.onclick=()=>{ if(b.dataset.c)return; b.dataset.c=1; b.classList.add("counted"); n++; speak(String(n)); tot.textContent="Counted: "+n; });
+    $("auto").onclick=()=>{ let i=0; const step=()=>{ if(i>=objs.length)return; const b=objs[i]; if(!b.dataset.c){b.dataset.c=1;b.classList.add("counted");} i++; speak(String(i)); tot.textContent="Counted: "+i; if(i<objs.length)setTimeout(step,480); }; step(); };
+    const o=$("opts"); nsChoices(it.n,10).forEach(v=>{ const b=elc("button","numBtn"); b.textContent=v; b.setAttribute("aria-label",v+""); b.onclick=()=>nsJudge(b,v===it.n,o); o.appendChild(b); });
+    bindListen(()=>speak(coach)); speak(coach,{rate:.9});
+  } else if(it.mode==="numeral"){
+    const coach=`Find the number ${it.n}. Tap the group that has ${it.n}.`;
+    const wrongs=nsChoices(it.n,9).filter(x=>x!==it.n).slice(0,2); const opts=shuffle([it.n,...wrongs]);
+    body.innerHTML=coachHTML(coach)+
+      `<div class="card"><div class="bigword">${it.n}</div><div class="prompt">Which group has ${it.n}?</div>
+       <div class="options" id="opts"></div><div class="encourage" id="enc"></div></div>`;
+    const o=$("opts");
+    opts.forEach(cnt=>{ const b=elc("button","opt"); b.innerHTML=`<span class="nsGroup">${it.ic.repeat(cnt)}</span>`; b.onclick=()=>nsJudge(b,cnt===it.n,o); o.appendChild(b); });
+    bindListen(()=>speak(coach)); speak(coach,{rate:.9});
+  } else {
+    const askTxt = it.ask==="more"?"Which side has MORE?":it.ask==="less"?"Which side has FEWER?":"Are the two sides the same?";
+    body.innerHTML=coachHTML(askTxt)+
+      `<div class="card"><div class="nsCompare">
+         <div class="nsSide"><div class="nsGroup">${it.icA.repeat(it.a)}</div></div>
+         <div class="nsSide"><div class="nsGroup">${it.icB.repeat(it.b)}</div></div></div>
+       <div class="prompt">${askTxt}</div><div class="options" id="opts"></div><div class="encourage" id="enc"></div></div>`;
+    const o=$("opts"); const correctSide = it.a>it.b?"L":"R";
+    const choices = it.ask==="equal" ? [["✅ Same","same"],["❌ Not the same","diff"]] : [["⬅️ Left side","L"],["Right side ➡️","R"]];
+    choices.forEach(([lab,val])=>{ const b=elc("button","opt txt"); b.textContent=lab;
+      const ok = it.ask==="equal" ? ((val==="same")===(it.a===it.b)) : (it.ask==="more" ? val===correctSide : val!==correctSide);
+      b.onclick=()=>nsJudge(b,ok,o); o.appendChild(b); });
+    bindListen(()=>speak(askTxt)); speak(askTxt,{rate:.9});
+  }
+}
+
+/* ===================== PHASE 3: WORD PROBLEMS (5 comprehension gates) ===================== */
+function rWordProblem(it, stage){
+  stage=stage||0; const body=$("actBody"), add=it.op==="add"; const next=()=>rWordProblem(it, stage+1);
+  const gateBar=`<div class="gateBar">${[1,2,3,4,5].map(i=>`<span class="${i-1<stage?'done':i-1===stage?'now':''}"></span>`).join("")}</div>`;
+  if(stage===0){
+    body.innerHTML=coachHTML("Step 1: What is happening? Listen to the story.")+gateBar+
+      `<div class="card"><div class="scene">${it.scene}</div><div class="storyText">${it.text}</div>
+       <button class="speakBtn" id="hb">🔊 Hear the story</button></div><button class="footerBtn" id="nx">I read it ▶️</button>`;
+    $("hb").onclick=()=>speak(it.text,{rate:.82}); bindListen(()=>speak(it.text,{rate:.82})); speak(it.text,{rate:.82}); $("nx").onclick=next;
+  } else if(stage===1){
+    body.innerHTML=coachHTML("Step 2: Are we putting together, or taking away?")+gateBar+
+      `<div class="card"><div class="storyText" style="font-size:17px">${it.text}</div><div class="opChoices" id="opc"></div><div class="encourage" id="enc"></div></div>`;
+    const oc=$("opc");
+    shuffle(["add","sub"]).forEach(op=>{ const m=OP_META[op],b=elc("button","opBtn "+m.cls); b.setAttribute("aria-label",m.label);
+      b.innerHTML=`<span class="opIc">${m.ic}</span><span>${m.label}</span>`;
+      b.onclick=()=>{ if(b.dataset.locked)return; if(op===it.op){ b.classList.add("correct"); speak(add?"Put together!":"Take away!"); setTimeout(next,700);} else { b.classList.add("wrong"); b.dataset.locked=1; (lesson._mis=lesson._mis||[]).push("operationConfusion"); $("enc").textContent="Listen to the words again."; speak(add?"They get more — put together.":"Some go away — take away."); } };
+      oc.appendChild(b); });
+    bindListen(()=>speak("Are we putting together, or taking away?")); speak("Are we putting together, or taking away?",{rate:.9});
+  } else if(stage===2){
+    const distract=shuffle([1,2,3,4,5,6,7,8,9].filter(x=>x!==it.a&&x!==it.b)).slice(0,2);
+    const nums=shuffle([it.a,it.b,...distract]); const found={};
+    body.innerHTML=coachHTML("Step 3: Which numbers are in the story? Tap both.")+gateBar+
+      `<div class="card"><div class="storyText" style="font-size:17px">${it.text}</div><div class="prompt">Tap the two numbers</div>
+       <div class="numChoices" id="opts"></div><div class="encourage" id="enc"></div></div>`;
+    const o=$("opts");
+    nums.forEach(v=>{ const b=elc("button","numBtn"); b.textContent=v; b.setAttribute("aria-label",v+"");
+      b.onclick=()=>{ if(b.dataset.done)return; if(v===it.a||v===it.b){ b.classList.add("correct"); b.dataset.done=1; found[v]=1; speak(String(v)); if(found[it.a]&&found[it.b])setTimeout(next,600); } else { b.classList.add("wrong"); b.dataset.done=1; $("enc").textContent="That number isn't in the story."; } };
+      o.appendChild(b); });
+    bindListen(()=>speak("Which numbers are in the story? Tap both.")); speak("Which numbers are in the story?",{rate:.9});
+  } else if(stage===3){
+    body.innerHTML=coachHTML(add?`Step 4: Show it — ${it.a} and ${it.b} more.`:`Step 4: Show it — ${it.a}, take away ${it.b}.`)+gateBar+
+      `<div class="card"><div class="mathEq">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b}</div>
+       <div class="counters" id="counters"></div><button class="btnMini" id="auto">👀 Show me</button></div><button class="footerBtn" id="nx">I see it ▶️</button>`;
+    const c=$("counters");
+    if(add){ for(let i=0;i<it.a;i++)c.appendChild(makeBlock("g1")); const p=elc("div","plusSign");p.textContent="+";c.appendChild(p); for(let i=0;i<it.b;i++)c.appendChild(makeBlock("g2")); }
+    else { for(let i=0;i<it.a;i++){const b=makeBlock("g1"); if(i>=it.a-it.b)b.classList.add("gone"); c.appendChild(b);} }
+    $("auto").onclick=()=>speak(add?`${it.a}, and ${it.b} more.`:`${it.a}, take away ${it.b}.`,{rate:.85});
+    bindListen(()=>speak("Show it with the blocks.")); $("nx").onclick=next;
+  } else {
+    body.innerHTML=coachHTML(add?"Step 5: Solve. How many altogether?":"Step 5: Solve. How many are left?")+gateBar+
+      `<div class="card"><div class="mathEq big">${it.a} <span class="opsign ${add?'add':'sub'}">${add?'+':'–'}</span> ${it.b} = ?</div>
+       <div class="numChoices" id="opts"></div><div class="encourage" id="enc"></div></div>`;
+    const o=$("opts");
+    makeNumChoices({op:it.op,a:it.a,b:it.b,ans:it.ans,level:1}).forEach(v=>{ const b=elc("button","numBtn"); b.textContent=v; b.setAttribute("aria-label",v+"");
+      b.onclick=()=>{ if(b.dataset.locked)return; if(v===it.ans){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak("Yes! "+cheer()); setTimeout(nextStep,950);} else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); (lesson._mis=lesson._mis||[]).push(classifyMathError(it,v)||"offByOne"); $("enc").textContent="Count the blocks again 🌟"; } };
+      o.appendChild(b); });
+    bindListen(()=>speak(add?"How many altogether?":"How many are left?")); speak(add?"How many altogether?":"How many are left?",{rate:.9});
+  }
+}
+
+/* ===================== PHASE 4: RHYMING + SYLLABLES ===================== */
+function rRhyme(it){
+  const body=$("actBody"); const opts=shuffle([it.rhyme, ...it.distractors]);
+  body.innerHTML=coachHTML(`Which word rhymes with "${it.word}"?`)+
+    `<div class="card" style="padding:16px"><div class="bigEmoji">${it.ic}</div><div class="bigword" style="font-size:30px">${it.word}</div>
+      <button class="speakBtn" id="hb">🔊 Hear it</button></div><div class="options" id="opts"></div><div class="encourage" id="enc"></div>`;
+  $("hb").onclick=()=>speak(it.word);
+  const o=$("opts");
+  opts.forEach(op=>{ const b=elc("button","opt"); b.innerHTML=`${op.ic}<span class="lab">${op.word}</span>`;
+    b.onclick=()=>{ if(b.dataset.locked)return; if(op.word===it.rhyme.word){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak(`${it.word}... ${it.rhyme.word}. They rhyme!`); setTimeout(nextStep,1000);} else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Listen for the same ending 🌟"; speak(`${it.word}... ${op.word}. Not the same ending.`); } };
+    o.appendChild(b); });
+  bindListen(()=>speak(`Which word rhymes with ${it.word}?`)); speak(`Which word rhymes with ${it.word}?`,{rate:.9});
+}
+function rSyllable(it){
+  const body=$("actBody");
+  body.innerHTML=coachHTML(`Clap the beats in "${it.word}". How many?`)+
+    `<div class="card"><div class="bigEmoji">${it.ic}</div><div class="bigword" style="font-size:30px">${it.word}</div>
+      <button class="speakBtn" id="clap">👏 Clap it</button><div class="prompt">How many beats?</div>
+      <div class="numChoices" id="opts"></div><div class="encourage" id="enc"></div></div>`;
+  $("clap").onclick=()=>speak(it.word,{rate:.55});
+  const o=$("opts");
+  [1,2,3].forEach(v=>{ const b=elc("button","numBtn"); b.textContent=v; b.setAttribute("aria-label",v+" beats");
+    b.onclick=()=>{ if(b.dataset.locked)return; if(v===it.n){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak(`${it.word} has ${it.n} ${it.n===1?'beat':'beats'}!`); setTimeout(nextStep,1000);} else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Say it slowly and clap 🌟"; } };
+    o.appendChild(b); });
+  bindListen(()=>speak(`Clap the beats in ${it.word}. How many?`)); speak(`Clap the beats in ${it.word}.`,{rate:.85});
+}
+
 /* ---- AAC board (My Words) ---- */
 function showAACBoard(){
   currentTopic=null;
@@ -1550,7 +1703,8 @@ function validateContent(){
   const ok=[];
   TOPICS.forEach(t=>{
     if(!t||!t.id||!t.name||!t.type){ console.warn("All-Star: skipping malformed topic", t); return; }
-    if(t.type!=="math" && (!Array.isArray(t.items)||!t.items.length)){ console.warn("All-Star: topic has no items, skipping", t.id); return; }
+    const generated = t.type==="math" || t.type==="ns" || !!t.count;
+    if(!generated && (!Array.isArray(t.items)||!t.items.length)){ console.warn("All-Star: topic has no items, skipping", t.id); return; }
     ok.push(t);
   });
   TOPICS.length=0; ok.forEach(t=>TOPICS.push(t));

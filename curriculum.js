@@ -80,14 +80,23 @@ const CURRICULUM = [
   sk("r.blends","reading","phonics","Blends","1",3,["r.cvc_a","r.cvc_o"], {topic:"blends",formats:["learn","find","say"],vis:3,spd:1}),
   sk("r.sight1","reading","sight-words","Sight words 1","K-1",2,[], {topic:"sight1",formats:["learn","find"],vis:1,spd:1}),
   sk("r.sight2","reading","sight-words","Sight words 2","1",3,["r.sight1"], {topic:"sight2",formats:["learn","find"],vis:1,spd:1}),
+  sk("r.rhyme","reading","phonological-awareness","Rhyming","K",1,[], {topic:"rhyme",formats:["play"],vis:3,spd:1,
+     dev:"Hears a word and picks the word that rhymes."}),
+  sk("r.syllables","reading","phonological-awareness","Syllables","K-1",2,[], {topic:"syllables",formats:["play"],vis:3,spd:1,
+     dev:"Claps and counts the syllables (beats) in a word."}),
   sk("r.story","reading","comprehension","Story comprehension","1",4,["r.sight1"], {topic:"stories",formats:["read"],vis:3,spd:1,
      tags:[], dev:"Answers who / what / where about a short read-aloud story with picture choices."}),
 
-  /* ---------- MATH · number sense (planned activities) ---------- */
-  sk("m.count","math","number-sense","Count objects","K",1,[], {planned:true,vis:3,spd:1,
-     dev:"Counts a set of objects one-to-one and says how many."}),
-  sk("m.numeral","math","number-sense","Match numeral to quantity","K",1,["m.count"], {planned:true,vis:3,spd:1}),
-  sk("m.compare","math","number-sense","More / less / equal","K-1",2,["m.count"], {planned:true,vis:3,spd:1}),
+  /* ---------- MATH · number sense ---------- */
+  sk("m.count","math","number-sense","Count objects","K",1,[], {topic:"ns_count",formats:["play"],vis:3,spd:1,
+     dev:"Counts a set of objects one-to-one and chooses how many."}),
+  sk("m.numeral","math","number-sense","Match numeral to quantity","K",1,["m.count"], {topic:"ns_numeral",formats:["play"],vis:3,spd:1,
+     dev:"Matches a written number to the group with that many."}),
+  sk("m.compare","math","number-sense","More / less / equal","K-1",2,["m.count"], {topic:"ns_compare",formats:["play"],vis:3,spd:1,
+     dev:"Decides which group has more, fewer, or the same."}),
+  sk("m.wordproblem","math","operation-comprehension","Word problems (5 steps)","1-2",4,["m.wordclue"], {topic:"wordprob",formats:["solve"],vis:3,spd:1,
+     tags:["operationConfusion","choseSumOnSub","choseDifferenceOnAdd"],
+     dev:"Reads a story problem and works through 5 gates: what's happening, add or take away, which numbers, show it, solve."}),
 
   /* ---------- MATH · operations ---------- */
   sk("m.wordclue","math","operation-comprehension","Add or take-away words","1",2,[], {topic:"wordclue",formats:["sort"],vis:2,spd:1,
@@ -122,10 +131,11 @@ const CURRICULUM = [
 /** Skill factory — keeps the array above readable. */
 function sk(skillId, domain, strand, label, gradeBand, dev, prereqs, o){
   o=o||{};
+  const fcount = (o.formats && o.formats.length) ? o.formats.length : 2;
   return {
     skillId, domain, strand, label, gradeBand, developmentalLevel:dev,
     prerequisiteSkillIds:prereqs||[],
-    masteryCriteria: o.mastery || MASTERY_DEFAULT,
+    masteryCriteria: o.mastery || { days:3, independentAccuracy:0.8, formats: Math.min(2, Math.max(1, fcount)) },
     promptLevels: PROMPT_LEVELS.slice(),
     misconceptionTags: o.tags || [],
     itemTemplates: o.planned ? [{type:"planned"}] : (o.topic==="__aac" ? [{type:"board"}] : [{type:o.topic?"bank":"generated", topic:o.topic, level:o.level}]),
