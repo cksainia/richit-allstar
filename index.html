@@ -745,21 +745,21 @@ function rLearnPhon(){
     bindListen(()=>speak("This word is "+w.word));
     speak("This word is "+w.word);
   } else if(lesson.topic && lesson.topic.sub==="letter"){
-    const L=w.word.toUpperCase(), snd=phon(w.sounds[0]);
+    // SAY = single-beat spoken cue (no repeated letters); shown as clean /x/ slash notation.
+    const SAY={a:"aah",e:"eh",i:"ih",o:"awe",u:"uh",b:"buh",c:"kuh",d:"duh",f:"fuh",g:"guh",h:"huh",j:"juh",k:"kuh",l:"luh",m:"muh",n:"nuh",p:"puh",q:"kwuh",r:"ruh",s:"suh",t:"tuh",v:"vuh",w:"wuh",x:"ks",y:"yuh",z:"zuh"};
+    const L=w.word.toUpperCase(), disp="/"+w.word.toLowerCase()+"/", say=SAY[w.sounds[0].toLowerCase()]||phon(w.sounds[0]);
     const cap=s=> s ? s.charAt(0).toUpperCase()+s.slice(1) : s;
-    // Keep the stretched sound at the END so it never blends into the example word.
-    const coachTxt = w.label
-      ? `${cap(w.label)} starts with the letter ${L}. The ${L} sound is... ${snd}.`
-      : `The letter ${L}. Its sound is... ${snd}.`;
-    body.innerHTML=coachHTML(coachTxt)+
+    const coachDisp = w.label ? `${cap(w.label)} starts with the letter ${L}. The ${L} sound is ${disp}.` : `The letter ${L}. Its sound is ${disp}.`;
+    const coachSay  = w.label ? `${cap(w.label)} starts with the letter ${L}. The ${L} sound is... ${say}.` : `The letter ${L}. Its sound is... ${say}.`;
+    body.innerHTML=coachHTML(coachDisp)+
       `<div class="card"><div class="bigEmoji">${w.ic||"⭐"}</div>
         <div class="bigword">${L} ${w.word}</div>
         ${w.label?`<div class="label">${w.label}</div>`:""}
         <button class="speakBtn" id="blend">🔊 Hear the sound</button></div>
        <button class="footerBtn" id="nx">Got it! ⭐</button>`;
-    $("blend").onclick=()=>speak(`The ${L} sound is... ${snd}.`,{rate:.8});
-    bindListen(()=>speak(coachTxt));
-    speak(coachTxt,{rate:.9});
+    $("blend").onclick=()=>speak(`The ${L} sound is... ${say}.`,{rate:.8});
+    bindListen(()=>speak(coachSay));
+    speak(coachSay,{rate:.9});
   } else {
     const sndHTML=w.sounds.map(s=>`<button class="sbtn" data-s="${s}" aria-label="sound ${s}">${s}</button>`).join("");
     body.innerHTML=coachHTML("Tap each sound. Then blend them together.")+
