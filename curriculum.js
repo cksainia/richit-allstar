@@ -84,6 +84,12 @@ const CURRICULUM = [
      dev:"Hears a word and picks the word that rhymes."}),
   sk("r.syllables","reading","phonological-awareness","Syllables","K-1",2,[], {topic:"syllables",formats:["play"],vis:3,spd:1,
      dev:"Claps and counts the syllables (beats) in a word."}),
+  sk("r.minpairs","reading","phonics","Sound match (minimal pairs)","1",3,["r.cvc_a"], {topic:"minpairs",formats:["play"],vis:3,spd:1,
+     dev:"Hears a word and picks the right one from a near pair (cat / cap)."}),
+  sk("r.sequence","reading","comprehension","Sequencing (first/next/last)","1",4,["r.sight1"], {topic:"sequence",formats:["play"],vis:3,spd:1,
+     dev:"Puts the events of a short story in order: first, next, last."}),
+  sk("r.decodable","reading","fluency","Read a decodable sentence","1",4,["r.cvc_a","r.sight1"], {topic:"decodable",formats:["read"],vis:3,spd:1,
+     dev:"Reads a short decodable sentence and answers a question about it."}),
   sk("r.story","reading","comprehension","Story comprehension","1",4,["r.sight1"], {topic:"stories",formats:["read"],vis:3,spd:1,
      tags:[], dev:"Answers who / what / where about a short read-aloud story with picture choices."}),
 

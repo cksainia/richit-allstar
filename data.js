@@ -408,11 +408,58 @@ const SYLLABLES = [
   {word:"star",ic:"⭐",n:1},{word:"pizza",ic:"🍕",n:2},{word:"dinosaur",ic:"🦕",n:3},
 ];
 
+/* Minimal pairs (hear the word, tap the right picture) */
+const MINPAIRS = [
+  {target:"cap", pair:[{word:"cat",ic:"🐱"},{word:"cap",ic:"🧢"}]},
+  {target:"cat", pair:[{word:"cat",ic:"🐱"},{word:"cap",ic:"🧢"}]},
+  {target:"pan", pair:[{word:"pin",ic:"📌"},{word:"pan",ic:"🍳"}]},
+  {target:"pin", pair:[{word:"pin",ic:"📌"},{word:"pan",ic:"🍳"}]},
+  {target:"hat", pair:[{word:"hat",ic:"🎩"},{word:"hot",ic:"🔥"}]},
+  {target:"hot", pair:[{word:"hat",ic:"🎩"},{word:"hot",ic:"🔥"}]},
+  {target:"bug", pair:[{word:"bug",ic:"🐛"},{word:"bag",ic:"🎒"}]},
+  {target:"bag", pair:[{word:"bug",ic:"🐛"},{word:"bag",ic:"🎒"}]},
+  {target:"bed", pair:[{word:"bed",ic:"🛏️"},{word:"bad",ic:"😠"}]},
+];
+
+/* Sequencing — first / next / last */
+const SEQUENCES = [
+  {title:"Making toast", steps:[{ic:"🍞",text:"Get the bread"},{ic:"🔥",text:"Toast it"},{ic:"🧈",text:"Eat the toast"}]},
+  {title:"Planting a seed", steps:[{ic:"🌱",text:"Plant the seed"},{ic:"💧",text:"Water it"},{ic:"🌻",text:"It grows"}]},
+  {title:"Getting ready", steps:[{ic:"🛏️",text:"Wake up"},{ic:"👕",text:"Get dressed"},{ic:"🚌",text:"Go to school"}]},
+  {title:"Bath time", steps:[{ic:"🛁",text:"Fill the tub"},{ic:"🧼",text:"Wash up"},{ic:"🧖",text:"Dry off"}]},
+  {title:"Baseball", steps:[{ic:"⚾",text:"Throw the ball"},{ic:"🏏",text:"Hit it"},{ic:"🏃",text:"Run the bases"}]},
+  {title:"Snowman", steps:[{ic:"☃️",text:"Roll the snow"},{ic:"🥕",text:"Add a nose"},{ic:"🧣",text:"Add a scarf"}]},
+];
+
+/* Decodable sentences (CVC + sight words) with a quick comprehension check */
+const DECODABLE = [
+  {text:"The cat is on the mat.", ic:"🐱", q:"Where is the cat?", answer:{ic:"🟫",label:"On the mat"}, distractors:[{ic:"🛏️",label:"On the bed"},{ic:"📦",label:"In the box"}]},
+  {text:"I can see a big red bus.", ic:"🚌", q:"What can I see?", answer:{ic:"🚌",label:"A bus"}, distractors:[{ic:"🚗",label:"A car"},{ic:"🚲",label:"A bike"}]},
+  {text:"The dog ran in the sun.", ic:"🐶", q:"Who ran?", answer:{ic:"🐶",label:"The dog"}, distractors:[{ic:"🐱",label:"The cat"},{ic:"🐷",label:"The pig"}]},
+  {text:"A pig sat in the mud.", ic:"🐷", q:"Where did the pig sit?", answer:{ic:"💧",label:"In the mud"}, distractors:[{ic:"🛏️",label:"On the bed"},{ic:"🪵",label:"On a log"}]},
+  {text:"Mom and I had a hot bun.", ic:"🍔", q:"What did we have?", answer:{ic:"🍔",label:"A bun"}, distractors:[{ic:"🍎",label:"An apple"},{ic:"🥛",label:"Milk"}]},
+  {text:"The fish is in the net.", ic:"🐟", q:"Where is the fish?", answer:{ic:"🥅",label:"In the net"}, distractors:[{ic:"🌊",label:"In the sea"},{ic:"🪣",label:"In a bucket"}]},
+];
+
+/* Extra Story Time items: feeling + cause/effect comprehension */
+const STORY_EXTRA = [
+  {scene:"🍦😢", text:"Sam dropped his ice cream. It fell on the ground.", q:"How does Sam feel?", answer:{ic:"😢",label:"Sad"}, distractors:[{ic:"😀",label:"Happy"},{ic:"😴",label:"Sleepy"}]},
+  {scene:"🌧️☂️", text:"It started to rain. So Mia opened her umbrella.", q:"Why did Mia open her umbrella?", answer:{ic:"🌧️",label:"It was raining"}, distractors:[{ic:"☀️",label:"It was sunny"},{ic:"🌙",label:"It was night"}]},
+  {scene:"🎂😀", text:"It is Ben's birthday. He gets a big cake.", q:"How does Ben feel?", answer:{ic:"😀",label:"Happy"}, distractors:[{ic:"😠",label:"Mad"},{ic:"😢",label:"Sad"}]},
+  {scene:"🧩🙋", text:"The puzzle was very hard. So Lily asked for help.", q:"Why did Lily ask for help?", answer:{ic:"🧩",label:"It was hard"}, distractors:[{ic:"😴",label:"She was tired"},{ic:"🍎",label:"She was hungry"}]},
+];
+
 TOPICS.push(
   {id:"ns_count",   name:"Count Objects",    emoji:"🔢", type:"ns", mode:"count",   color:"blue",   count:8},
   {id:"ns_numeral", name:"Match the Number", emoji:"#️⃣", type:"ns", mode:"numeral", color:"teal",   count:8},
   {id:"ns_compare", name:"More or Less",     emoji:"⚖️", type:"ns", mode:"compare", color:"purple", count:8},
   {id:"wordprob",   name:"Word Problems",    emoji:"🧩", type:"wordproblem", color:"green", items:WORDPROBS},
   {id:"rhyme",      name:"Rhyming",          emoji:"🎵", type:"rhyme",    color:"pink", items:RHYMES},
-  {id:"syllables",  name:"Syllables",        emoji:"👏", type:"syllable", color:"sun",  items:SYLLABLES}
+  {id:"syllables",  name:"Syllables",        emoji:"👏", type:"syllable", color:"sun",  items:SYLLABLES},
+  {id:"minpairs",   name:"Sound Match",      emoji:"👂", type:"minpair",  color:"teal", items:MINPAIRS},
+  {id:"sequence",   name:"What Comes First", emoji:"🔢", type:"sequence", color:"purple", items:SEQUENCES},
+  {id:"decodable",  name:"Read a Sentence",  emoji:"📃", type:"decodable", color:"blue", items:DECODABLE}
 );
+
+/* append feeling + cause/effect stories to Story Time */
+(function(){ const s=TOPICS.find(t=>t.id==="stories"); if(s&&s.items) s.items.push(...STORY_EXTRA); })();

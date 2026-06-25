@@ -375,6 +375,9 @@
   .gateBar span{width:38px;height:7px;border-radius:6px;background:var(--line);}
   .gateBar span.done{background:var(--good);}
   .gateBar span.now{background:var(--blue);}
+  .decSentence{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0 4px;}
+  .decWord{font-size:24px;font-weight:800;color:var(--ink);background:var(--soft);border:2px solid var(--line);border-radius:10px;padding:6px 12px;cursor:pointer;}
+  .decWord:active{transform:translateY(2px);background:#e8eef6;}
 </style>
 </head>
 <body>
@@ -558,7 +561,7 @@ function topicProgress(t){
   return Math.round(done/target*100);
 }
 const SECTIONS=[
-  {key:"reading", label:"📖 Reading", ids:["letters","rhyme","syllables","cvc_a","cvc_e","cvc_i","cvc_o","cvc_u","digraphs","blends","sight1","sight2","stories"]},
+  {key:"reading", label:"📖 Reading", ids:["letters","rhyme","syllables","cvc_a","cvc_e","cvc_i","cvc_o","cvc_u","minpairs","digraphs","blends","sight1","sight2","decodable","stories","sequence"]},
   {key:"math", label:"🔢 Math", ids:["ns_count","ns_numeral","ns_compare","add","sub","wordclue","wordprob"]},
   {key:"talking", label:"💬 Talking", ids:["comm_want","comm_comment","comm_problem","comm_social","directions"]},
   {key:"feelings", label:"😊 Feelings", ids:["feelings"]},
@@ -628,6 +631,9 @@ const ACTIVITY_SETS={
   wordproblem:[{k:"solve",big:"🧩",t:"Word Problem",d:"Read · decide · show · solve"}],
   rhyme:[{k:"play",big:"🎵",t:"Find the Rhyme",d:"Which word sounds the same?"}],
   syllable:[{k:"play",big:"👏",t:"Clap the Beats",d:"How many syllables?"}],
+  minpair:[{k:"play",big:"👂",t:"Sound Match",d:"Hear it, tap the right one"}],
+  sequence:[{k:"play",big:"🔢",t:"What Comes First",d:"Put it in order"}],
+  decodable:[{k:"read",big:"📃",t:"Read a Sentence",d:"Read, then answer"}],
 };
 function mathLevelChooser(id){
   const cur=state.mathLevel[id]||1, unlocked=level2Unlocked(id), prog=Math.min(state.mlc[id+"|1"]||0, MATH_MASTER);
@@ -718,6 +724,9 @@ function renderStep(){
   else if(lesson.type==="wordproblem"){ rWordProblem(lesson.items[lesson.idx], 0); }
   else if(lesson.type==="rhyme"){ rRhyme(lesson.items[lesson.idx]); }
   else if(lesson.type==="syllable"){ rSyllable(lesson.items[lesson.idx]); }
+  else if(lesson.type==="minpair"){ rMinPair(lesson.items[lesson.idx]); }
+  else if(lesson.type==="sequence"){ rSequence(lesson.items[lesson.idx], 0); }
+  else if(lesson.type==="decodable"){ rDecodable(lesson.items[lesson.idx]); }
 }
 function coachHTML(text){
   return `<div class="coach"><span class="face">🦉</span><span class="bubble">${text}</span><button class="listen" id="listenBtn">🔊 Listen</button></div>`;
@@ -1210,6 +1219,60 @@ function rSyllable(it){
     b.onclick=()=>{ if(b.dataset.locked)return; if(v===it.n){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak(`${it.word} has ${it.n} ${it.n===1?'beat':'beats'}!`); setTimeout(nextStep,1000);} else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Say it slowly and clap 🌟"; } };
     o.appendChild(b); });
   bindListen(()=>speak(`Clap the beats in ${it.word}. How many?`)); speak(`Clap the beats in ${it.word}.`,{rate:.85});
+}
+
+/* ===================== PHASE 4: minimal pairs, sequencing, decodable ===================== */
+function rMinPair(it){
+  const body=$("actBody"); const opts=shuffle(it.pair.slice());
+  body.innerHTML=coachHTML(`Listen, then tap the one that says "${it.target}".`)+
+    `<div class="card" style="padding:14px"><button class="speakBtn" id="play">🔊 Play the word</button></div>
+     <div class="options" id="opts"></div><div class="encourage" id="enc"></div>`;
+  $("play").onclick=()=>speak(it.target);
+  const o=$("opts");
+  opts.forEach(op=>{ const b=elc("button","opt"); b.innerHTML=`${op.ic}<span class="lab">${op.word}</span>`;
+    b.onclick=()=>{ if(b.dataset.locked)return;
+      if(op.word===it.target){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak("Yes! "+it.target); setTimeout(nextStep,900);}
+      else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Listen again 🌟"; speak("Listen. "+it.target); } };
+    o.appendChild(b); });
+  bindListen(()=>speak(`Tap the one that says ${it.target}.`)); speak(`Tap the one that says ${it.target}.`,{rate:.9});
+}
+function rSequence(it, stage){
+  stage=stage||0; const body=$("actBody"); const next=()=>rSequence(it, stage+1);
+  if(stage>=2) return;
+  const ask = stage===0?"first":"last";
+  const correct = stage===0? it.steps[0] : it.steps[2];
+  const story = it.steps.map(s=>s.text).join(", then ")+".";
+  body.innerHTML=coachHTML(`${it.title}. What happened ${ask.toUpperCase()}?`)+
+    `<div class="card" style="padding:14px"><div class="storyText" style="font-size:17px">${story}</div>
+      <button class="speakBtn" id="hb">🔊 Hear it</button></div>
+     <div class="options" id="opts"></div><div class="encourage" id="enc"></div>`;
+  $("hb").onclick=()=>speak(it.title+". "+story,{rate:.85});
+  const o=$("opts");
+  shuffle(it.steps).forEach(st=>{ const b=elc("button","opt"); b.innerHTML=`${st.ic}<span class="lab">${st.text}</span>`;
+    b.onclick=()=>{ if(b.dataset.locked)return;
+      if(st.text===correct.text){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); $("enc").textContent=cheer(); speak((ask==="first"?"First, ":"Last, ")+correct.text+"!");
+        if(stage===0){ setTimeout(next,1000); } else { bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); setTimeout(nextStep,1000); } }
+      else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Think about the order 🌟"; speak("What happened "+ask+"?"); } };
+    o.appendChild(b); });
+  bindListen(()=>speak(`${it.title}. What happened ${ask}?`)); speak(`What happened ${ask}?`,{rate:.9});
+}
+function rDecodable(it){
+  const body=$("actBody"); const words = it.text.replace(/\./g,"").split(" ");
+  body.innerHTML=coachHTML("Read the sentence. Tap each word to hear it.")+
+    `<div class="card"><div class="bigEmoji">${it.ic}</div>
+      <div class="decSentence">${words.map(w=>`<button class="decWord">${w}</button>`).join(" ")}</div>
+      <button class="speakBtn" id="hb">🔊 Read it to me</button>
+      <div class="prompt" style="margin-top:14px;color:var(--ink);font-size:17px">❓ ${it.q}</div></div>
+     <div class="options" id="opts"></div><div class="encourage" id="enc"></div>`;
+  body.querySelectorAll(".decWord").forEach(b=>b.onclick=()=>speak(b.textContent));
+  $("hb").onclick=()=>speak(it.text,{rate:.8});
+  const o=$("opts");
+  shuffle([it.answer,...it.distractors]).forEach(op=>{ const b=elc("button","opt"); b.innerHTML=`${op.ic}<span class="lab">${op.label}</span>`;
+    b.onclick=()=>{ if(b.dataset.locked)return;
+      if(op.label===it.answer.label){ b.classList.add("correct"); [...o.children].forEach(x=>x.dataset.locked=1); bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak(cheer()); setTimeout(nextStep,900);}
+      else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Look back at the words 🌟"; speak("Look back at the words."); } };
+    o.appendChild(b); });
+  bindListen(()=>speak(it.text+" ... "+it.q,{rate:.8})); speak(it.text,{rate:.8});
 }
 
 /* ---- AAC board (My Words) ---- */
