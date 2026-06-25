@@ -463,24 +463,57 @@ function saveState(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}
 
 /* ===================== SPEECH ===================== */
 let enVoice=null;
+/** Rank voices so we default to the most natural one available on the device. */
+function voiceRank(v){
+  const n=(v.name||"").toLowerCase(), l=(v.lang||"").toLowerCase(); let s=0;
+  if(/google/.test(n)) s+=6;                                   // Chrome/Android neural
+  if(/natural|neural|premium|enhanced/.test(n)) s+=6;          // iOS/Edge enhanced
+  if(/samantha|siri|ava|allison|nicky|aaron|tom|evan|joelle/.test(n)) s+=4; // good Apple voices
+  if(v.localService===false) s+=2;                             // network/neural voices
+  if(/en[-_]us/.test(l)) s+=2; else if(/^en/.test(l)) s+=1;
+  if(/compact|fred|albert|zarvox|eloquence|espeak/.test(n)) s-=4; // known robotic
+  return s;
+}
 function pickVoice(){
   if(!('speechSynthesis'in window))return;
   const vs=speechSynthesis.getVoices();
   if(state.voice){ const v=vs.find(v=>v.name===state.voice); if(v){enVoice=v;return;} }
-  enVoice=vs.find(v=>/en[-_]US/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||vs[0]||null;
+  const en=vs.filter(v=>/^en/i.test(v.lang||""));
+  enVoice=(en.length?en:vs).slice().sort((a,b)=>voiceRank(b)-voiceRank(a))[0]||null;
+}
+function bestEnglishVoices(){
+  if(!('speechSynthesis'in window))return [];
+  return speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang||"")).sort((a,b)=>voiceRank(b)-voiceRank(a));
 }
 if('speechSynthesis'in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+
+let speakToken=0;
+/** Speak naturally: one sentence per utterance, with a real pause after each. */
 function speak(text,opts){
   opts=opts||{};
   if(muted||!('speechSynthesis'in window)||!text)return;
-  try{ speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(text);
-    const q=state.settings&&state.settings.quiet;
-    u.lang="en-US"; if(enVoice)u.voice=enVoice; u.rate=opts.rate||(q?0.85:0.9); u.pitch=opts.pitch||1.05; u.volume=q?0.6:1;
-    speechSynthesis.speak(u);
-  }catch(e){}
+  const myTok=++speakToken;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  const st=state.settings||{};
+  const baseRate = opts.rate || (st.slowSpeech?0.72 : (st.quiet?0.82 : 0.86));
+  const vol = st.quiet?0.65:1;
+  // split into sentence-ish chunks, keeping the trailing punctuation
+  let parts;
+  try{ parts=String(text).split(/(?<=[.?!…])\s+/); }catch(e){ parts=String(text).split(/([.?!…])\s+/); }
+  parts=parts.map(s=>s.trim()).filter(Boolean);
+  let i=0;
+  const sayNext=()=>{
+    if(myTok!==speakToken || i>=parts.length) return;
+    let u; try{ u=new SpeechSynthesisUtterance(parts[i]); }catch(e){ return; }
+    u.lang="en-US"; if(enVoice)u.voice=enVoice; u.rate=baseRate; u.pitch=opts.pitch||1.0; u.volume=vol;
+    const hardStop=/[.?!…]$/.test(parts[i]);
+    u.onend=()=>{ if(myTok!==speakToken)return; i++; if(i<parts.length) setTimeout(sayNext, hardStop?360:160); };
+    u.onerror=()=>{ if(myTok!==speakToken)return; i++; if(i<parts.length) setTimeout(sayNext, 200); };
+    try{ speechSynthesis.speak(u); }catch(e){}
+  };
+  sayNext();
 }
-function stopSpeak(){ if('speechSynthesis'in window)speechSynthesis.cancel(); }
+function stopSpeak(){ speakToken++; if('speechSynthesis'in window){ try{speechSynthesis.cancel();}catch(e){} } }
 /* phoneme approximations so letter sounds are read, not letter names */
 const PH={a:"aah",e:"eh",i:"ih",o:"awe",u:"uh",b:"buh",c:"kuh",d:"duh",f:"fff",g:"guh",h:"huh",
   j:"juh",k:"kuh",l:"lll",m:"mmm",n:"nnn",p:"puh",q:"kwuh",r:"rrr",s:"sss",t:"tuh",v:"vvv",
@@ -1649,8 +1682,8 @@ function openParent(){
   for(let i=13;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const k=todayKey(d); const on=state.log[k]; if(on)active++;
     cal+=`<div class="day"><div class="box ${on?'on':''}">${on?'⭐':''}</div><div class="dl">${d.getDate()}</div></div>`; }
   const chips=Object.keys(state.seen).slice(-24).map(s=>`<span class="chip">${s.replace('feeling:','😊 ')}</span>`).join("")||'<span class="note">Nothing yet.</span>';
-  const vs=('speechSynthesis'in window)?speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang)).slice(0,6):[];
-  const vHTML=vs.length?vs.map(v=>`<button class="vbtn ${state.voice===v.name?'on':''}" data-v="${v.name}">${v.name.replace(/Microsoft|Google|Apple/,'').trim().slice(0,20)}</button>`).join(""):'<span class="note">Voices load in Chrome/Safari — reopen if empty.</span>';
+  const vs=bestEnglishVoices().slice(0,8);
+  const vHTML=vs.length?vs.map((v,i)=>`<button class="vbtn ${state.voice===v.name?'on':''}" data-v="${v.name}">${i===0&&!state.voice?'⭐ ':''}${v.name.replace(/Microsoft|Google|Apple/,'').trim().slice(0,22)}</button>`).join(""):'<span class="note">Voices load in Chrome/Safari — reopen if empty.</span>';
 
   $("parentBody").innerHTML=`
     <div class="pcard"><div class="statRow">
@@ -1675,7 +1708,7 @@ function openParent(){
 
     <div class="pcard"><div style="font-weight:900;font-size:16px">Voice</div>
       <div class="vrow" id="vrow">${vHTML}</div>
-      <div class="note" style="margin-top:6px">Pick the voice Richit likes. Instructions are always read aloud; tap 🔊 to replay.</div></div>
+      <div class="note" style="margin-top:6px">⭐ marks the most natural voice on this device. For much better quality on iPad, download an <b>Enhanced/Premium</b> voice in iOS Settings → Accessibility → Spoken Content → Voices, then pick it here. Use “Slower speech” above if it feels rushed.</div></div>
 
     <div class="pcard"><div style="font-weight:900;font-size:16px">Coaching at home 🏡</div>
       <div class="note">Difficulty never ramps up on its own — Richit replays the same level as long as he likes. If he misses twice, the app gently highlights the answer. Praise effort, not just correct answers. Use today's Word of the Day in a real sentence at dinner. For "My Words," have him <b>say the phrase out loud</b> after the app models it — that's his gestalt-language goal in action.</div></div>
@@ -1707,6 +1740,7 @@ function openParent(){
         ${setToggle("opStep","Ask \"add or take away?\" first",1)}
         ${setToggle("guided","Guided: count before answering",0)}
         ${setToggle("reduceMotion","Reduce motion (no confetti)",0)}
+        ${setToggle("slowSpeech","Slower speech",0)}
         ${setToggle("quiet","Quieter voice",0)}
         ${setToggle("calm","Calm rewards (no big celebration)",0)}
         ${setToggle("highContrast","High contrast",0)}
