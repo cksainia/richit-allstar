@@ -14,15 +14,21 @@
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;}
   :root{
-    --bg1:#eef4fc; --bg2:#e6eef7; --ink:#22304a; --muted:#64748b;
-    --card:#ffffff; --soft:#eef3f9; --line:#e2e9f2;
-    --blue:#3f7fe0; --blue2:#2f63b8; --green:#48b463; --teal:#1bb3a6;
-    --purple:#8b6fd6; --pink:#ef7d9d; --sun:#f3b73b; --good:#1c9e57;
-    --field:#3f9d52; --field2:#2f7e41; --dirt:#c98a4b;
-    --shadow:rgba(26,40,70,.10); --shadowS:rgba(26,40,70,.06);
+    /* Phase 7 design system — soft neutral surface + restrained accents */
+    --bg1:#f4f6f9; --bg2:#eef1f6; --ink:#1e293b; --muted:#64748b;
+    --card:#ffffff; --soft:#f1f4f8; --line:#e4e8ef;
+    --blue:#2f6fed; --blue2:#2459c4;            /* primary */
+    --green:#1f9d57; --good:#1f9d57;            /* success */
+    --amber:#dd9026;                            /* warning */
+    --rose:#e0566e;                             /* error */
+    /* secondary accents (used sparingly for tile/category coding) */
+    --teal:#1aa8a0; --purple:#7a66cf; --pink:#e07da0; --sun:#e0a93a;
+    --field:#2f8f4e; --field2:#26793f; --dirt:#c98a4b;
+    --shadow:rgba(20,30,55,.08); --shadowS:rgba(20,30,55,.05);
+    --r:12px;
   }
   html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:var(--ink);}
-  body{background:radial-gradient(120% 80% at 50% -10%,#ffffff 0%,var(--bg1) 48%,var(--bg2) 100%);overflow:hidden;}
+  body{background:var(--bg1);overflow:hidden;}
   #app{height:100vh;height:100dvh;display:flex;flex-direction:column;max-width:780px;margin:0 auto;position:relative;}
   .screen{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 18px 60px;}
   .hidden{display:none!important;}
@@ -320,6 +326,43 @@
   .overlay.calm .grow{animation:none;}
   body.reduce-motion *{animation:none !important; transition:none !important;}
   body.reduce-motion .confetti{display:none !important;}
+
+  /* ===== Phase 7: professional design system ===== */
+  /* consistent, calmer radii */
+  .card,.pcard,.panel,.rewardCard{border-radius:var(--r);}
+  .unit,.opt,.numBtn,.aacBtn,.actBtn,.wotd,.btnMini,.tab,.lvlBtn,.opBtn,.footerBtn,.playBtn,.planBtn,.speakBtn,.btn,.iconbtn,.backBtn,.listen,.recBtn,.vbtn{border-radius:10px;}
+  /* flatter, calmer surfaces (minimal gradients) */
+  #landingScreen{background:var(--blue);}
+  .landingBadge{background:rgba(255,255,255,.16);box-shadow:none;}
+  .landingTitle{text-shadow:none;}
+  .playBtn{box-shadow:0 4px 0 rgba(0,0,0,.12);}
+  #field{background:var(--field);box-shadow:0 6px 20px var(--shadow);}
+  .wotd{background:var(--soft);}
+  .unit{border-top-width:4px;}
+  .tab.on{background:var(--blue);border-color:var(--blue);}
+  /* softer, single-elevation shadows everywhere */
+  .pill,.iconbtn,.unit,.actBtn,.card,.pcard{box-shadow:0 1px 3px var(--shadowS);}
+
+  /* High-contrast mode */
+  body.high-contrast{--ink:#0a0f1c;--muted:#1f2a3d;--line:#0a0f1c;--bg1:#ffffff;--bg2:#ffffff;--soft:#eef1f6;}
+  body.high-contrast .card,body.high-contrast .pcard,body.high-contrast .panel,body.high-contrast .unit,
+  body.high-contrast .opt,body.high-contrast .numBtn,body.high-contrast .aacBtn,body.high-contrast .actBtn,
+  body.high-contrast .pill,body.high-contrast .iconbtn,body.high-contrast .tab,body.high-contrast .coach,
+  body.high-contrast .opBtn,body.high-contrast .lvlBtn,body.high-contrast .vbtn{border:2px solid #0a0f1c !important;box-shadow:none !important;}
+  body.high-contrast .coach,body.high-contrast .wotd{background:#fff;}
+  body.high-contrast .muted,body.high-contrast .note,body.high-contrast .sub{color:#1f2a3d;}
+
+  /* Larger-text mode */
+  body.big-text .coach .bubble{font-size:18.5px;}
+  body.big-text .storyText{font-size:24px;}
+  body.big-text .opt,body.big-text .opt.txt{font-size:24px;}
+  body.big-text .numBtn{font-size:34px;}
+  body.big-text .unit .name{font-size:17px;}
+  body.big-text .mathEq{font-size:34px;}
+  body.big-text .mathEq.big{font-size:46px;}
+  body.big-text .prompt{font-size:18px;}
+  body.big-text .aacBtn,body.big-text .tab,body.big-text .actBtn .t{font-size:17px;}
+  body.big-text .sub{font-size:16px;}
 </style>
 </head>
 <body>
@@ -436,7 +479,12 @@ const $=id=>document.getElementById(id);
 const elc=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
 function show(s){ ["homeScreen","menuScreen","actScreen","parentScreen"].forEach(x=>$(x).classList.add("hidden")); $(s).classList.remove("hidden"); $(s).scrollTop=0;
   const fab=$("breakFab"); if(fab){ const showFab = s==="actScreen" && (!state.settings || state.settings.breakBtn!==false); fab.classList.toggle("hidden", !showFab); } }
-function applySettings(){ document.body.classList.toggle("reduce-motion", !!(state.settings && state.settings.reduceMotion)); }
+function applySettings(){
+  const s=state.settings||{};
+  document.body.classList.toggle("reduce-motion", !!s.reduceMotion);
+  document.body.classList.toggle("high-contrast", !!s.highContrast);
+  document.body.classList.toggle("big-text", !!s.bigText);
+}
 function openBreak(){ stopSpeak();
   const ov=elc("div","overlay"); ov.innerHTML=`<div class="rewardCard"><div class="breathe">Breathe…</div>
     <div style="font-weight:800;font-size:16px;margin-top:4px">In… and out…</div>
@@ -1441,6 +1489,8 @@ function openParent(){
         ${setToggle("reduceMotion","Reduce motion (no confetti)",0)}
         ${setToggle("quiet","Quieter voice",0)}
         ${setToggle("calm","Calm rewards (no big celebration)",0)}
+        ${setToggle("highContrast","High contrast",0)}
+        ${setToggle("bigText","Larger text",0)}
         ${setToggle("breakBtn","Always show Break button",1)}
       </div>
       <div class="note" style="margin-top:6px">These tailor the app to how Richit is feeling that day.</div></div>
