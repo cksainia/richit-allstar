@@ -391,12 +391,16 @@
 <div class="toast" id="toast"></div>
 
 <script src="data.js"></script>
+<script src="curriculum.js"></script>
+<script src="scoring.js"></script>
+<script src="adaptive.js"></script>
+<script src="planner.js"></script>
 <script>
 /* ===================== STATE ===================== */
 const SAVE_KEY="richitAllStar_v1";
 let state=loadState(), muted=false, currentTopic=null, lesson=null;
 function loadState(){ try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) return Object.assign(base(),s);}catch(e){} return base(); }
-function base(){ return {stars:0, runs:0, basePos:0, team:[], done:{}, log:{}, seen:{}, stats:{}, voice:null, mathLevel:{add:1,sub:1}, mlc:{}, mathUnlock:{}, errpat:{}, hints:{}, replays:0, opStat:{}, settings:{}}; }
+function base(){ return {stars:0, runs:0, basePos:0, team:[], done:{}, log:{}, seen:{}, stats:{}, voice:null, mathLevel:{add:1,sub:1}, mlc:{}, mathUnlock:{}, errpat:{}, hints:{}, replays:0, opStat:{}, settings:{}, skills:{}, flags:{}}; }
 function saveState(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(e){} }
 
 /* ===================== SPEECH ===================== */
@@ -604,7 +608,7 @@ function startActivity(id,kind,len){
   lesson={id,kind,type:t.type,items,idx:0,correct:0,topic:t,level:lvl};
   const s=state.stats[id]||(state.stats[id]={a:0,c:0,sess:0}); s.sess++; saveState();
   const pb=$("planBar");
-  if(pb){ if(plan){ pb.textContent=`📋 Step ${plan.i+1} of ${PLAN.length}  →  then ⚾`; pb.classList.remove("hidden"); } else pb.classList.add("hidden"); }
+  if(pb){ if(plan){ pb.textContent=`📋 Step ${plan.i+1} of ${plan.steps.length}  →  then ⚾`; pb.classList.remove("hidden"); } else pb.classList.add("hidden"); }
   renderDots(); renderStep(); show("actScreen");
 }
 function renderDots(){
@@ -616,7 +620,26 @@ function nextStep(){
   if(lesson.idx>=lesson.items.length){ return finishActivity(); }
   renderDots(); renderStep();
 }
+/* ---- adaptive instrumentation: prompt level + per-item logging ---- */
+function itemPromptLevel(){
+  if(lesson._revealed) return "modeled";
+  if((lesson._wrong||0)>=1) return "visual";
+  if(lesson._replayed) return "replay";
+  return "independent";
+}
+function logSkillResolved(){
+  if(typeof skillForActivity!=="function") return;
+  const sk=skillForActivity(lesson.id, lesson.level);
+  if(!sk || sk.ungraded) return;
+  const pl=itemPromptLevel();
+  const mis=(lesson._mis||[]).slice();
+  if(pl==="modeled") mis.push("neededAnswerReveal");
+  else if(lesson._replayed && pl!=="independent") mis.push("neededAudioReplay");
+  if((lesson.kind==="sticks"||lesson.kind==="tally") && !lesson._acted && (lesson._wrong||0)>0) mis.push("guessedWithoutModel");
+  recordItem(sk.skillId, {format:lesson.kind, promptLevel:pl, misconceptions:mis});
+}
 function renderStep(){
+  lesson._wrong=0; lesson._mis=[]; lesson._replayed=false; lesson._acted=false; lesson._revealed=false;
   const k=lesson.kind;
   if(lesson.type==="phonics"){ k==="learn"?rLearnPhon():k==="find"?rFindPhon():rSay(phonItemText()); }
   else if(lesson.type==="comm"){ k==="learn"?rLearnComm():k==="choose"?rChooseComm():rSay(lesson.items[lesson.idx].say); }
@@ -629,7 +652,7 @@ function renderStep(){
 function coachHTML(text){
   return `<div class="coach"><span class="face">🦉</span><span class="bubble">${text}</span><button class="listen" id="listenBtn">🔊 Listen</button></div>`;
 }
-function bindListen(fn){ const b=$("listenBtn"); if(b){ b.setAttribute("aria-label","Listen again"); b.onclick=()=>{ state.replays=(state.replays||0)+1; saveState(); fn(); }; } }
+function bindListen(fn){ const b=$("listenBtn"); if(b){ b.setAttribute("aria-label","Listen again"); b.onclick=()=>{ state.replays=(state.replays||0)+1; if(lesson)lesson._replayed=true; saveState(); fn(); }; } }
 
 /* ---- PHONICS: Learn ---- */
 function rLearnPhon(){
@@ -766,7 +789,7 @@ function rDirections(){
     if(b.dataset.e===want){
       b.classList.add("correct"); b.style.pointerEvents="none"; lesson._dirStep++;
       if(lesson._dirStep>=lesson._dirTargets.length){
-        bumpStat(lesson.id,true); lesson.correct++; $("enc").textContent=cheer(); speak(cheer());
+        bumpStat(lesson.id,true); lesson.correct++; logSkillResolved(); $("enc").textContent=cheer(); speak(cheer());
         o.querySelectorAll(".opt").forEach(x=>x.style.pointerEvents="none"); setTimeout(nextStep,800);
       } else { $("enc").textContent="Good! Now the next one 👍"; speak("Good! Now the next one."); }
     } else {
@@ -791,7 +814,7 @@ function rFeelings(){
     b.onclick=()=>{
       if(op.label===it.feeling.label){ bumpStat(lesson.id,true); lesson.correct++; markSeen("feeling:"+it.feeling.label);
         o.querySelectorAll(".opt").forEach(x=>x.style.pointerEvents="none"); b.classList.add("correct");
-        speak("Yes! They feel "+it.feeling.label+". That is okay. Let's get calm."); setTimeout(calmStep,1000);
+        logSkillResolved(); speak("Yes! They feel "+it.feeling.label+". That is okay. Let's get calm."); setTimeout(calmStep,1000);
       } else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false);
         $("enc").textContent="Look at the face 🌟"; hintText(o,it.feeling.label); speak("Look at the face. They might feel "+it.feeling.label); }
     };
@@ -907,6 +930,7 @@ function hintLadder(it,container){
     if(enc)enc.textContent="Watch the blocks… 👀";
     const a=$("auto"); if(a){ a.click(); } else speak("Count them carefully.");
   } else {
+    lesson._revealed=true;
     const right=[...container.querySelectorAll(".numBtn")].find(b=>+b.textContent===it.ans);
     if(right) right.classList.add("hintReveal");
     if(enc)enc.textContent=`${it.a} ${add?'+':'–'} ${it.b} = ${it.ans}`;
@@ -940,18 +964,21 @@ function answerNum(btn,chosen,it,container){
   if(btn.dataset.locked)return;
   if(chosen===it.ans){
     btn.classList.add("correct"); container.querySelectorAll(".numBtn").forEach(b=>b.dataset.locked=1);
-    onMathCorrect(it);
+    onMathCorrect(it); logSkillResolved();
     const enc=$("enc"); if(enc)enc.textContent=cheer(); speak(cheer());
     setTimeout(nextStep,950);
   } else {
     btn.classList.add("wrong"); btn.dataset.locked=1; bumpStat(lesson.id,false);
-    recordError(lesson.id, classifyError(it,chosen));
+    const tag = classifyMathError(it,chosen) || classifyError(it,chosen);
+    recordError(lesson.id, tag); if(tag){ lesson._mis=lesson._mis||[]; lesson._mis.push(tag); }
     hintLadder(it,container);
   }
 }
 function mathChoices(it){
   const opts=$("opts");
   makeNumChoices(it).forEach(v=>{ const btn=elc("button","numBtn"); btn.textContent=v; btn.setAttribute("aria-label",v+""); btn.onclick=()=>answerNum(btn,v,it,opts); opts.appendChild(btn); });
+  ["counters","tw"].forEach(idd=>{ const el=$(idd); if(el) el.addEventListener("click",()=>{ if(lesson)lesson._acted=true; }); });
+  const a=$("auto"); if(a) a.addEventListener("click",()=>{ if(lesson)lesson._acted=true; });
   guardAnswers();
 }
 function guardAnswers(){
@@ -976,8 +1003,8 @@ function rWordClue(it){
   shuffle(["add","sub"]).forEach(op=>{ const m=OP_META[op], b=elc("button","opBtn "+m.cls); b.setAttribute("aria-label",m.label);
     b.innerHTML=`<span class="opIc">${m.ic}</span><span>${m.label}</span>`;
     b.onclick=()=>{ if(b.dataset.locked)return;
-      if(op===it.op){ b.classList.add("correct"); bumpStat(lesson.id,true); lesson.correct++; markSeen("word: "+it.word); speak(op==="add"?"Yes — put together!":"Yes — take away!"); setTimeout(nextStep,800); }
-      else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); $("enc").textContent="Let's look again."; speak(`The word ${it.word} means `+(it.op==="add"?"put together.":"take away.")); }
+      if(op===it.op){ b.classList.add("correct"); bumpStat(lesson.id,true); lesson.correct++; markSeen("word: "+it.word); logSkillResolved(); speak(op==="add"?"Yes — put together!":"Yes — take away!"); setTimeout(nextStep,800); }
+      else { b.classList.add("wrong"); b.dataset.locked=1; bumpStat(lesson.id,false); (lesson._mis=lesson._mis||[]).push("wrongWordMeaning"); $("enc").textContent="Let's look again."; speak(`The word ${it.word} means `+(it.op==="add"?"put together.":"take away.")); }
     };
     oc.appendChild(b);
   });
@@ -1010,11 +1037,19 @@ const PLAN=[
   {id:"feelings",k:"feel",len:1},
 ];
 let plan=null;
-function startPlan(){ $("landingScreen").classList.add("hidden"); $("topbar").classList.remove("hidden"); plan={i:0}; runPlanStep(); }
+function startPlan(){
+  $("landingScreen").classList.add("hidden"); $("topbar").classList.remove("hidden");
+  let steps=[]; try{ steps=buildAdaptivePlan(); }catch(e){ steps=[]; }
+  if(!steps || !steps.length) steps=PLAN.map(s=>{ const a=(typeof activityForSkill==="function"&&null); return {topic:s.id,kind:s.k,len:s.len}; });
+  plan={i:0, steps};
+  runPlanStep();
+}
 function runPlanStep(){
   if(!plan) return;
-  if(plan.i>=PLAN.length){ plan=null; return planComplete(); }
-  const s=PLAN[plan.i]; startActivity(s.id,s.k,s.len);
+  if(plan.i>=plan.steps.length){ plan=null; return planComplete(); }
+  const s=plan.steps[plan.i];
+  if(s.level && state.mathLevel && state.mathLevel[s.topic]!=null) state.mathLevel[s.topic]=s.level;
+  startActivity(s.topic, s.kind, s.len);
 }
 function planComplete(){
   const pb=$("planBar"); if(pb)pb.classList.add("hidden");
@@ -1044,7 +1079,7 @@ function rOpStep(it,done){
     b.onclick=()=>{
       if(b.dataset.locked)return;
       if(op===it.op){ b.classList.add("correct"); state.opStat[lesson.id+"|ok"]=(state.opStat[lesson.id+"|ok"]||0)+1; saveState(); speak(add?"Put together!":"Take away!"); setTimeout(done,700); }
-      else { b.classList.add("wrong"); b.dataset.locked=1; recordError(lesson.id,"opConfusion"); $("enc").textContent="Look at the sign. 👀"; speak(add?"This sign means put together.":"This sign means take away."); }
+      else { b.classList.add("wrong"); b.dataset.locked=1; recordError(lesson.id,"opConfusion"); (lesson._mis=lesson._mis||[]).push("operationConfusion"); $("enc").textContent="Look at the sign. 👀"; speak(add?"This sign means put together.":"This sign means take away."); }
     };
     oc.appendChild(b);
   });
@@ -1198,7 +1233,7 @@ function rMathLine(it){
     paintLine(span,pos); $("hopn").textContent=remain;
     if(remain<=0){
       hb.querySelectorAll("button").forEach(b=>b.disabled=true);
-      onMathCorrect(it);
+      onMathCorrect(it); logSkillResolved();
       $("enc").textContent=`🎉 ${it.a} ${add?'+':'–'} ${it.b} = ${pos}`;
       speak(`We landed on ${pos}! ${it.a} ${add?'plus':'minus'} ${it.b} is ${pos}.`);
       setTimeout(nextStep,5000);
@@ -1245,7 +1280,7 @@ function rMathQuiz(it){
 function judge(btn,correct,container,sayOk,hintFn){
   if(btn.dataset.locked)return;
   if(correct){
-    btn.classList.add("correct"); lesson.correct++; bumpStat(lesson.id,true);
+    btn.classList.add("correct"); lesson.correct++; bumpStat(lesson.id,true); logSkillResolved();
     container.querySelectorAll(".opt").forEach(c=>c.dataset.locked=1);
     const enc=$("enc"); if(enc)enc.textContent=cheer(); if(sayOk)sayOk();
     setTimeout(nextStep,850);
@@ -1292,7 +1327,7 @@ function showReward(earned){
   const ov=elc("div","overlay"+(calm?" calm":""));
   const scored = state.basePos===0; // just crossed home
   let btns;
-  if(plan){ const last=plan.i>=PLAN.length-1; btns=`<button class="footerBtn" style="margin-top:14px" id="rwNext">${last?'Finish 🎉':'Next ▶️'}</button>`; }
+  if(plan){ const last=plan.i>=plan.steps.length-1; btns=`<button class="footerBtn" style="margin-top:14px" id="rwNext">${last?'Finish 🎉':'Next ▶️'}</button>`; }
   else { btns=`<button class="footerBtn" style="margin-top:14px" id="rwHome">Back to the Field 🏟️</button>
     <button class="backBtn" style="margin-top:10px" id="rwAgain">▶️ Play again</button>`; }
   ov.innerHTML=`<div class="rewardCard">
@@ -1384,6 +1419,21 @@ function openParent(){
         <button class="vbtn ${level2Unlocked('sub')?'on':''}" id="ulSub">${level2Unlocked('sub')?'Subtraction L2 ✓':'Unlock Subtraction L2'}</button>
       </div></div>
 
+    <div class="pcard"><div style="font-weight:900;font-size:16px">This week 📝</div>
+      ${weeklyNarrative().map(s=>`<div class="note" style="margin:4px 0">• ${s}</div>`).join("")}</div>
+
+    <div class="pcard"><div style="font-weight:900;font-size:16px;margin-bottom:2px">Skill tree</div>
+      <div class="note">Each skill becomes ⭐ Mastered after 3 different days, 80%+ independent, across 2 activity formats.</div>
+      ${skillTreeHTML()}</div>
+
+    <div class="pcard"><div style="font-weight:900;font-size:16px;margin-bottom:4px">Misconception report 🔬</div>
+      ${(function(){const m=misconceptionReport(); return m.length?m.slice(0,8).map(([t,n])=>`<div class="note" style="margin:3px 0">• ${(MISCONCEPTION_LABEL[t]||t)} — <b>${n}×</b></div>`).join(""):'<div class="note">None recorded yet.</div>';})()}</div>
+
+    <div class="pcard"><div style="font-weight:900;font-size:16px;margin-bottom:4px">Prompt-level report 🪜</div>
+      <div class="note">How much help recent answers needed (independent is the goal).</div>
+      ${(function(){const p=promptLevelReport(); const tot=p.independent+p.replay+p.visual+p.modeled||1; const row=(l,v,c)=>`<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:130px;font-size:13px;font-weight:700">${l}</span><div class="pbar" style="flex:1"><i style="width:${Math.round(100*v/tot)}%;background:${c}"></i></div><span class="note" style="width:36px;text-align:right">${v}</span></div>`;
+        return row("Independent",p.independent,"#1c9e57")+row("After replay",p.replay,"#3f7fe0")+row("After a hint",p.visual,"#e8913a")+row("Answer shown",p.modeled,"#e0697a");})()}</div>
+
     <div class="pcard"><div style="font-weight:900;font-size:16px">Sensory & learning settings 🎛️</div>
       <div class="vrow" id="setRow">
         ${setToggle("opStep","Ask \"add or take away?\" first",1)}
@@ -1456,6 +1506,45 @@ function validateContent(){
   TOPICS.length=0; ok.forEach(t=>TOPICS.push(t));
 }
 
+/* ---- adaptive dashboard reports ---- */
+function weeklyNarrative(){
+  const out=[]; const S=state.skills||{};
+  const wc=S["m.wordclue"];
+  if(wc&&wc.att>=4&&indAccuracy("m.wordclue")>=0.6) out.push("Richit is improving at telling addition words from subtraction words.");
+  const sub=S["m.sub1"];
+  if(sub&&sub.mis&&(sub.mis.choseSumOnSub||0)>=2) out.push("During subtraction he still sometimes chooses the sum instead of taking away — keep modelling 'take away' with the blocks.");
+  const add=S["m.add1"];
+  if(add&&add.mis&&(add.mis.countedOnlyFirstGroup||0)>=2) out.push("In addition he sometimes counts only the first group — point to both groups before he answers.");
+  const c=skillStateCounts();
+  if(c.mastered>0) out.push(`${c.mastered} skill${c.mastered>1?'s':''} now meet the mastery bar (3 days · 80% independent · 2 formats).`);
+  if(c.emerging>0) out.push(`${c.emerging} skill${c.emerging>1?'s are':' is'} emerging.`);
+  let modeled=0,total=0; CURRICULUM.forEach(s=>{const r=S[s.skillId]; if(r)r.recent.forEach(x=>{total++; if(x.pl==="modeled"||x.pl==="visual")modeled++;});});
+  if(total>=10&&modeled/total>0.4) out.push("He's leaning on hints and models right now — independence grows as he repeats the same skill across different days.");
+  if(!out.length) out.push("Not enough practice yet this week to summarise patterns — a few short sessions will fill this in.");
+  return out;
+}
+function promptLevelReport(){ const c={independent:0,replay:0,visual:0,modeled:0}; CURRICULUM.forEach(s=>{const r=state.skills&&state.skills[s.skillId]; if(r)r.recent.forEach(x=>{ if(c[x.pl]!=null)c[x.pl]++; });}); return c; }
+function misconceptionReport(){ const agg={}; CURRICULUM.forEach(s=>{const r=state.skills&&state.skills[s.skillId]; if(r)Object.keys(r.mis||{}).forEach(t=>agg[t]=(agg[t]||0)+r.mis[t]);}); return Object.entries(agg).sort((a,b)=>b[1]-a[1]); }
+function skillTreeHTML(){
+  const LBL={"not-started":"not started","needs-support":"Needs support","supported":"Supported","emerging":"Emerging","mastered":"⭐ Mastered"};
+  const CLR={"not-started":"#9aa7b8","needs-support":"#e0697a","supported":"#e8913a","emerging":"#3f7fe0","mastered":"#1c9e57"};
+  const doms=[["reading","📖 Reading"],["math","🔢 Math"],["language","🧩 Language"],["communication","💬 Communication"],["social-emotional","😊 Social-Emotional"]];
+  let html="";
+  doms.forEach(([d,lbl])=>{
+    const list=CURRICULUM.filter(s=>s.domain===d); if(!list.length)return;
+    html+=`<div style="font-weight:800;margin:10px 0 4px">${lbl}</div>`;
+    list.forEach(s=>{
+      if(s.planned){ html+=`<div class="note" style="opacity:.55;margin:2px 0">○ ${s.label} — coming soon</div>`; return; }
+      const st=skillState(s.skillId), pr=skillProgress(s.skillId);
+      html+=`<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+        <div style="flex:1"><b style="font-size:13.5px">${s.label}</b>
+          <div class="pbar" style="margin-top:3px"><i style="width:${pr}%"></i></div></div>
+        <span style="font-size:11.5px;font-weight:800;color:${CLR[st]};white-space:nowrap">${LBL[st]}</span></div>`;
+    });
+  });
+  return html;
+}
+
 /* ---- parent data tools ---- */
 function download(name,text,mime){
   try{ const b=new Blob([text],{type:mime}); const u=URL.createObjectURL(b); const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
@@ -1464,6 +1553,11 @@ function download(name,text,mime){
 function statRowsForExport(){ const rows=[]; TOPICS.forEach(t=>{ const s=state.stats[t.id]; if(!s||!s.a)return; rows.push([t.name, s.sess||0, s.a, s.c, Math.round(100*s.c/s.a)]); }); return rows; }
 function exportCSV(){
   let lines=[["Skill","Plays","Tries","Correct","Accuracy%"], ...statRowsForExport()];
+  lines.push([],["Skill","State","Progress%","IndependentAcc%","Days","Formats"]);
+  CURRICULUM.filter(s=>!s.planned&&!s.ungraded).forEach(s=>{ const r=state.skills&&state.skills[s.skillId]; if(!r||!r.att)return;
+    lines.push([s.label, skillState(s.skillId), skillProgress(s.skillId), Math.round(100*indAccuracy(s.skillId)), Object.keys(r.days).length, Object.keys(r.formats).length]); });
+  lines.push([],["Misconception","Count"]); misconceptionReport().forEach(([t,n])=>lines.push([MISCONCEPTION_LABEL[t]||t, n]));
+  lines.push([],["This week"]); weeklyNarrative().forEach(s=>lines.push([s]));
   lines.push([],["Patterns"]); mathInsights().forEach(i=>lines.push([i]));
   lines.push([],["Stars",state.stars],["Runs",state.runs],["Skills practiced",Object.keys(state.seen).length],["Days practiced",Object.keys(state.log).length]);
   const csv=lines.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
