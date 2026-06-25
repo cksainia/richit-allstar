@@ -746,14 +746,18 @@ function rLearnPhon(){
     speak("This word is "+w.word);
   } else if(lesson.topic && lesson.topic.sub==="letter"){
     const L=w.word.toUpperCase(), snd=phon(w.sounds[0]);
-    const coachTxt=`The letter ${L} says "${snd}".`+(w.label?` ${w.label} starts with that sound.`:"");
+    const cap=s=> s ? s.charAt(0).toUpperCase()+s.slice(1) : s;
+    // Keep the stretched sound at the END so it never blends into the example word.
+    const coachTxt = w.label
+      ? `${cap(w.label)} starts with the letter ${L}. The ${L} sound is... ${snd}.`
+      : `The letter ${L}. Its sound is... ${snd}.`;
     body.innerHTML=coachHTML(coachTxt)+
       `<div class="card"><div class="bigEmoji">${w.ic||"⭐"}</div>
         <div class="bigword">${L} ${w.word}</div>
         ${w.label?`<div class="label">${w.label}</div>`:""}
         <button class="speakBtn" id="blend">🔊 Hear the sound</button></div>
        <button class="footerBtn" id="nx">Got it! ⭐</button>`;
-    $("blend").onclick=()=>speak(`${L} says ${snd}.`+(w.label?` ${w.label}.`:""),{rate:.8});
+    $("blend").onclick=()=>speak(`The ${L} sound is... ${snd}.`,{rate:.8});
     bindListen(()=>speak(coachTxt));
     speak(coachTxt,{rate:.9});
   } else {
@@ -766,9 +770,9 @@ function rLearnPhon(){
         <button class="speakBtn" id="blend">🔊 Blend it: ${w.word}</button></div>
        <button class="footerBtn" id="nx">Got it! ⭐</button>`;
     body.querySelectorAll(".sbtn").forEach(b=>b.onclick=()=>{ b.classList.add("lit"); speak(phon(b.dataset.s),{rate:.75}); setTimeout(()=>b.classList.remove("lit"),450); });
-    $("blend").onclick=()=>speak(w.sounds.map(phon).join(" ")+" ... "+w.word,{rate:.8});
-    bindListen(()=>speak("Sound it out. "+w.sounds.map(phon).join(". ")+". "+w.word));
-    speak("Sound it out. "+w.word);
+    $("blend").onclick=()=>speak(w.sounds.map(phon).join(", ")+". The word is "+w.word+".",{rate:.8});
+    bindListen(()=>speak("Listen. "+w.sounds.map(phon).join(", ")+". The word is "+w.word+"."));
+    speak("Let's sound out the word: "+w.word+".");
   }
   $("nx").onclick=()=>{ bumpStat(lesson.id,true); lesson.correct++; markSeen(w.word); nextStep(); };
 }
